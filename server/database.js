@@ -6,10 +6,10 @@ const DATABASE_URL = process.env.DATABASE_URL;
 
 let db, dbAsync;
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Helper: convert SQLite ?-style placeholders to PostgreSQL $1,$2,... style
-// ─────────────────────────────────────────────────────────────────────────────
+// If SQL already uses $N style, skip conversion
 function toPostgres(sql) {
+  if (/\$\d+/.test(sql)) return sql; // already PostgreSQL style
   let i = 0;
   return sql.replace(/\?/g, () => `$${++i}`);
 }
