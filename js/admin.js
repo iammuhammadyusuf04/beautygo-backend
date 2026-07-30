@@ -401,6 +401,7 @@ window.saveProduct = async function(e) {
 
   const payload = {
     store_id: storeId,
+    telegram_id: currentUser.telegram_id,
     title_uz: document.getElementById('prodTitleUz').value,
     title_ru: document.getElementById('prodTitleRu').value || document.getElementById('prodTitleUz').value,
     price: document.getElementById('prodPrice').value,
@@ -410,6 +411,7 @@ window.saveProduct = async function(e) {
     description_ru: document.getElementById('prodDescUz').value,
     images: uploadedImagesList.length > 0 ? uploadedImagesList : ['https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=450&q=80']
   };
+
 
   const url = editId ? `/api/products/${editId}` : '/api/products';
   const method = editId ? 'PUT' : 'POST';
