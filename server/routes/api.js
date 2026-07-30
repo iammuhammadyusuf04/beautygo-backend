@@ -31,8 +31,8 @@ router.post('/init-user', async (req, res) => {
 
     // Search user by telegram_id OR username match
     let user = await dbAsync.get(
-      'SELECT * FROM users WHERE telegram_id = ? OR (username != "" AND LOWER(username) = LOWER(?))',
-      [tid, cleanUsername]
+      'SELECT * FROM users WHERE telegram_id = $1 OR (username IS NOT NULL AND username != $2 AND LOWER(username) = LOWER($3))',
+      [tid, '', cleanUsername]
     );
 
     // Auto-link telegram_id if user was originally created by username
