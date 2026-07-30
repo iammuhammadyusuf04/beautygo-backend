@@ -1,0 +1,464 @@
+/* =========================================================
+   🌸 Beauty & Elegance Telegram Mini App Design System
+   Modern Beauty Palette: #FF4D8D, #C13584, #5A1827
+   Glassmorphism + Google Fonts Outfit & Inter
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap');
+
+:root {
+  --primary-pink: #FF4D8D;
+  --deep-magenta: #C13584;
+  --wine-dark: #5A1827;
+  --accent-gold: #FFD700;
+  
+  --bg-gradient: linear-gradient(135deg, #18091C 0%, #0D040F 50%, #220A21 100%);
+  --card-glass: rgba(255, 255, 255, 0.06);
+  --card-glass-hover: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 77, 141, 0.2);
+
+  --text-main: #FFFFFF;
+  --text-muted: #D1B3C4;
+  --text-dim: #997B8D;
+
+  --font-title: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+
+  --shadow-pink: 0 8px 25px rgba(255, 77, 141, 0.25);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: var(--font-body);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--bg-gradient);
+  color: var(--text-main);
+  min-height: 100vh;
+  padding-bottom: 90px;
+  overflow-x: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--deep-magenta);
+  border-radius: 4px;
+}
+
+.lang-btn {
+  background: rgba(255,77,141,0.2);
+  border: 1px solid var(--primary-pink);
+  color: var(--primary-pink);
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* Main Container */
+.app-container {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* Header */
+.app-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+.brand-title {
+  font-family: var(--font-title);
+  font-size: 26px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #FFF 30%, var(--primary-pink) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Search Box */
+.search-container {
+  position: relative;
+  margin-bottom: 16px;
+}
+.search-input {
+  width: 100%;
+  background: var(--card-glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  padding: 12px 16px 12px 42px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.3s;
+}
+.search-input:focus {
+  border-color: var(--primary-pink);
+  box-shadow: 0 0 15px rgba(255, 77, 141, 0.3);
+}
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+/* Categories Scroll */
+.categories-wrapper {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 20px;
+}
+.cat-chip {
+  background: var(--card-glass);
+  border: 1px solid var(--glass-border);
+  color: var(--text-muted);
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.cat-chip.active, .cat-chip:hover {
+  background: linear-gradient(135deg, var(--primary-pink), var(--deep-magenta));
+  color: #FFF;
+  border-color: transparent;
+  box-shadow: var(--shadow-pink);
+}
+
+/* Product Grid */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.product-card {
+  background: var(--card-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  position: relative;
+}
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(255, 77, 141, 0.2);
+  border-color: rgba(255, 77, 141, 0.5);
+}
+.product-img-wrapper {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: rgba(0,0,0,0.2);
+  position: relative;
+}
+.product-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.product-card:hover .product-img {
+  transform: scale(1.06);
+}
+.product-store-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(18, 9, 20, 0.9);
+  color: var(--accent-gold);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+.product-info {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+.product-category {
+  font-size: 10px;
+  color: var(--primary-pink);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.product-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-main);
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.product-bottom {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.product-price {
+  font-family: var(--font-title);
+  font-size: 14px;
+  font-weight: 700;
+  color: #FFF;
+}
+.add-btn {
+  background: linear-gradient(135deg, var(--primary-pink), var(--deep-magenta));
+  color: #FFF;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(255, 77, 141, 0.3);
+  transition: transform 0.2s ease;
+}
+.add-btn:active {
+  transform: scale(0.9);
+}
+
+/* Modals & Drawers - Fixed for 100% Telegram WebApp Touch & Click Compatibility */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 4, 12, 0.92);
+  z-index: 99999;
+  display: flex;
+  align-items: flex-end;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.modal-content {
+  background: #1C0A1E;
+  border-top: 2px solid var(--primary-pink);
+  border-radius: 28px 28px 0 0;
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px 20px;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  pointer-events: auto;
+}
+.modal-overlay.active .modal-content {
+  transform: translateY(0);
+}
+
+/* Highly Visible & Prominent Modal Close Button (X) */
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(18, 9, 20, 0.95);
+  border: 1.5px solid var(--primary-pink);
+  color: #FFFFFF;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: 0 4px 15px rgba(255, 77, 141, 0.4);
+  transition: all 0.25s ease;
+}
+.modal-close:hover, .modal-close:active {
+  background: var(--primary-pink);
+  transform: scale(1.1);
+}
+
+/* Floating Bottom Nav */
+.floating-nav {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 460px;
+  background: rgba(30, 10, 32, 0.95);
+  border: 1px solid var(--glass-border);
+  border-radius: 30px;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 1500;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+  padding: 4px 8px;
+}
+.nav-item i {
+  font-size: 18px;
+  margin-bottom: 2px;
+}
+.nav-item.active {
+  color: var(--primary-pink);
+  font-weight: 700;
+}
+
+/* Admin & Super Admin Cards & Tables */
+.admin-card {
+  background: var(--card-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.stat-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 77, 141, 0.15);
+  border-radius: var(--radius-md);
+  padding: 12px 8px;
+  text-align: center;
+}
+.stat-val {
+  font-family: var(--font-title);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary-pink);
+}
+.stat-lbl {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.role-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  width: 100%;
+  background: linear-gradient(135deg, var(--primary-pink), var(--deep-magenta));
+  color: #FFF;
+  border: none;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-pink);
+  transition: transform 0.2s ease;
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+.form-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  background: rgba(0,0,0,0.45);
+  border: 1.5px solid var(--glass-border);
+  color: #FFF;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  outline: none;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+.form-input:focus, .form-textarea:focus {
+  border-color: var(--primary-pink);
+  background: rgba(255, 77, 141, 0.1);
+  box-shadow: 0 0 10px rgba(255, 77, 141, 0.3);
+}
+
+
+.order-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-block;
+}
+.order-badge.PENDING { background: rgba(255, 215, 0, 0.2); color: #FFD700; border: 1px solid #FFD700; }
+.order-badge.APPROVED { background: rgba(46, 204, 113, 0.2); color: #2ECC71; border: 1px solid #2ECC71; }
+.order-badge.CANCELLED { background: rgba(231, 76, 60, 0.2); color: #E74C3C; border: 1px solid #E74C3C; }
+
+@media (max-width: 360px) {
+  .products-grid {
+    grid-template-columns: 1fr;
+  }
+}
