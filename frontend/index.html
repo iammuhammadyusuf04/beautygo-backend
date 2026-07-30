@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>BeautyGo - Mini Marketplace</title>
+  
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    if (window.Telegram && window.Telegram.WebApp) {
+      try {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      } catch (e) {}
+    }
+  </script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom Glassmorphism Stylesheet -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Brand Header -->
+    <header class="app-header">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="brand-title" style="display:flex; align-items:center; gap:10px;">
+          <img src="images/logo.jpg" style="width:38px; height:38px; object-fit:contain; border-radius:10px; border:1px solid rgba(255,255,255,0.15);">
+          <span data-i18n="app_title">BeautyGo</span>
+        </div>
+        <button class="lang-btn" onclick="toggleLang()" id="langBtn" style="padding:5px 12px; font-size:12px; font-weight:700;">UZ</button>
+      </div>
+      <div class="brand-subtitle" style="margin-top:4px;" data-i18n="subtitle">Ayollar kosmetikasi va nafis kiyim-kechaklar</div>
+    </header>
+
+    <!-- Dedicated Store Profile View Banner (When clicking on a Store) -->
+    <div class="admin-card" id="storeBanner" style="display:none; margin-bottom:16px; border-color:var(--primary-pink); background:linear-gradient(135deg, rgba(255,77,141,0.15), rgba(18,9,20,0.85));">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+        <button class="role-btn" style="background:rgba(255,255,255,0.1); padding:4px 10px; font-size:11px;" onclick="clearStoreFilter()">
+          <i class="fa-solid fa-arrow-left"></i> Bosh katalogga qaytish
+        </button>
+        <span style="font-size:11px; color:var(--accent-gold);" id="bannerSubCount">🔔 0 obunachilar</span>
+      </div>
+
+      <div style="display:flex; gap:14px; align-items:center; margin-top:8px;">
+        <img id="bannerStoreLogo" src="" style="width:58px; height:58px; object-fit:cover; border-radius:50%; border:2px solid var(--primary-pink); box-shadow:0 0 12px rgba(255,77,141,0.4);">
+        <div style="flex-grow:1;">
+          <h3 id="bannerStoreName" style="font-family:var(--font-title); font-size:18px; color:var(--primary-pink);">Do'kon Nomi</h3>
+          <p id="bannerStoreDesc" style="font-size:12px; color:var(--text-muted); margin-top:2px;"></p>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="role-btn" style="flex:1; background:linear-gradient(135deg, var(--primary-pink), var(--deep-magenta)); padding:8px; font-size:12px; font-weight:700;" id="subBtn" onclick="toggleSubscription()">
+          🔔 Obuna bo'lish
+        </button>
+        <button class="role-btn" style="flex:1; background:rgba(255,255,255,0.12); padding:8px; font-size:12px;" onclick="shareStoreLink()">
+          🔗 Do'konni Ulashish
+        </button>
+      </div>
+    </div>
+
+    <!-- Marketplace Main View -->
+    <main id="marketplaceView">
+      
+      <!-- Search Input -->
+      <div class="search-container">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" class="search-input" id="searchInput" placeholder="Mahsulotlarni qidirish..." data-i18n="search_placeholder" oninput="onSearchInput()">
+      </div>
+
+      <!-- Categories Filter Chips -->
+      <div class="categories-wrapper" id="categoriesWrapper">
+        <div class="cat-chip active" onclick="selectCategory('All', this)" data-i18n="cat_all">🌸 Barchasi</div>
+        <div class="cat-chip" onclick="selectCategory('Parfyum', this)" data-i18n="cat_parfum">✨ Parfyum</div>
+        <div class="cat-chip" onclick="selectCategory('Kosmetika', this)" data-i18n="cat_cosmetics">💄 Kosmetika</div>
+        <div class="cat-chip" onclick="selectCategory('Teri parvarishi', this)" data-i18n="cat_skincare">🌿 Teri parvarishi</div>
+        <div class="cat-chip" onclick="selectCategory('Kiyimlar', this)" data-i18n="cat_apparel">👗 Kiyimlar</div>
+      </div>
+
+      <!-- Products Grid -->
+      <div class="products-grid" id="productsGrid">
+        <!-- Dynamic Product Cards loaded via JS -->
+      </div>
+    </main>
+
+    <!-- User Orders View -->
+    <section id="ordersView" style="display:none;">
+      <h2 style="font-family:var(--font-title); font-size:20px; margin-bottom:16px;" data-i18n="orders_history">Buyurtmalarim Tarixi</h2>
+      <div id="userOrdersList">
+        <!-- Dynamic User Orders -->
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Floating Bottom Navigation Bar for Customer -->
+  <nav class="floating-nav" id="bottomNav">
+    <div class="nav-item active" id="navKatalog" onclick="showTab('marketplace')">
+      <i class="fa-solid fa-store"></i>
+      <span>Katalog</span>
+    </div>
+    <div class="nav-item" id="navOrders" onclick="showTab('orders')">
+      <i class="fa-solid fa-bag-shopping"></i>
+      <span>Buyurtmalar</span>
+    </div>
+    <div class="nav-item" id="navCart" onclick="openCartModal()">
+      <i class="fa-solid fa-cart-shopping"></i>
+      <span>Savatcha</span>
+      <span class="nav-badge" id="cartCountBadge" style="display:none;">0</span>
+    </div>
+  </nav>
+
+  <!-- Modal: Product Details -->
+  <div class="modal-overlay" id="productDetailModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('productDetailModal')">&times;</button>
+      <div id="productDetailBody">
+        <!-- Product Details loaded via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cart & Checkout Drawer -->
+  <div class="modal-overlay" id="cartModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('cartModal')">&times;</button>
+      <h2 style="font-family:var(--font-title); font-size:20px; margin-bottom:16px;" data-i18n="cart_title">Sizning Savatchangiz</h2>
+      <div id="cartItemsList">
+        <!-- Cart Items -->
+      </div>
+      
+      <div id="checkoutFormSection" style="margin-top:20px; border-top:1px solid var(--glass-border); padding-top:16px; display:none; padding-bottom:120px;">
+        <h3 style="font-size:16px; margin-bottom:12px;" data-i18n="checkout_title">Buyurtmani Rasmiylashtirish</h3>
+        <div class="form-group">
+          <label class="form-label" data-i18n="checkout_name">Ismingiz</label>
+          <input type="text" class="form-input" id="checkoutName" placeholder="Zuhra Karimova" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="checkout_phone">Telefon raqamingiz</label>
+          <input type="text" inputmode="tel" class="form-input" id="checkoutPhone" placeholder="+998 90 123 45 67" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sotuvchiga Izoh / Eslatma (Ixtiyoriy)</label>
+          <textarea class="form-textarea" id="checkoutNote" rows="3" placeholder="Masalan: Qizil rangini yuboring yoki soat 18:00 dan keyin yetkazib bering..." style="-webkit-user-select:text; user-select:text;"></textarea>
+        </div>
+        <button class="btn-primary" onclick="submitCheckout()" data-i18n="place_order">Buyurtma berish</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/app.js"></script>
+
+
+</body>
+</html>
