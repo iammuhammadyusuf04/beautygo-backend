@@ -59,15 +59,16 @@ if (DATABASE_URL) {
         .replace(/\bINSERT\s+OR\s+REPLACE\s+INTO\b/gi, 'INSERT INTO')
         .replace(/\bINSERT\s+OR\s+IGNORE\s+INTO\b/gi, 'INSERT INTO');
 
-      // If it's an INSERT without ON CONFLICT, add ON CONFLICT DO NOTHING for safety
+      // If it's an INSERT without RETURNING, add RETURNING * to get lastID safely
       const trimUpper = pgSql.trim().toUpperCase();
       if (trimUpper.startsWith('INSERT') && !trimUpper.includes('ON CONFLICT') && !trimUpper.includes('RETURNING')) {
-        pgSql += ' RETURNING id';
+        pgSql += ' RETURNING *';
       }
 
       try {
         const result = await pool.query(pgSql, params.length > 0 ? params : undefined);
-        const lastID = result.rows && result.rows[0] ? result.rows[0].id : null;
+        // Some tables use 'id', others use 'telegram_id' as primary key
+        const lastID = result.rows && result.rows[0] ? (result.rows[0].id || null) : null;
         return { lastID, changes: result.rowCount };
       } catch (err) {
         if (err.code === '42701') return { lastID: null, changes: 0 }; // column already exists
@@ -75,6 +76,7 @@ if (DATABASE_URL) {
         console.error('dbAsync.run error:', err.message, '\nSQL:', pgSql, '\nParams:', params);
         throw err;
       }
+
     }
   };
 
