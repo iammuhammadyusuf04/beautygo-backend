@@ -95,8 +95,12 @@ router.post('/init-user', async (req, res) => {
 router.get('/products', async (req, res) => {
   try {
     const { category, search, store_id } = req.query;
-    // Include images_json so we can pick the real first image
-    let sql = 'SELECT p.id, p.store_id, p.title_uz, p.title_ru, p.price, p.category, p.sizes, p.image_url, p.images_json, s.store_name, s.logo_url as store_logo FROM products p JOIN stores s ON p.store_id = s.id WHERE p.is_active = 1';
+    let sql = `SELECT p.id, p.store_id, p.title_uz, p.title_ru, p.price, p.category, p.sizes, p.image_url, p.images_json,
+               COALESCE(s.store_name, 'BeautyGo Boutique') as store_name,
+               COALESCE(s.logo_url, 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=200&q=80') as store_logo
+               FROM products p
+               LEFT JOIN stores s ON p.store_id = s.id
+               WHERE (p.is_active = 1 OR p.is_active IS NULL)`;
     let params = [];
 
     if (category && category !== 'All') {
@@ -113,6 +117,7 @@ router.get('/products', async (req, res) => {
     }
 
     sql += ' ORDER BY p.id DESC';
+
     const products = await dbAsync.all(sql, params);
 
     const formatted = products.map(p => {
@@ -196,14 +201,21 @@ router.post('/products', async (req, res) => {
   try {
     let { store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, images, telegram_id } = req.body;
 
-    let targetStoreId = store_id;
+    let targetStoreId = null;
 
-    // Auto-resolve storeId if missing or unassigned
+    // 1. If user telegram_id provided, check if they own a store
     if (telegram_id) {
       const owned = await dbAsync.get('SELECT id FROM stores WHERE owner_telegram_id = ? ORDER BY id DESC LIMIT 1', [String(telegram_id)]);
       if (owned) targetStoreId = owned.id;
     }
 
+    // 2. If store_id was passed, check if it exists in stores table
+    if (!targetStoreId && store_id) {
+      const validStore = await dbAsync.get('SELECT id FROM stores WHERE id = ?', [store_id]);
+      if (validStore) targetStoreId = validStore.id;
+    }
+
+    // 3. Fallback to active store
     if (!targetStoreId) {
       const activeStore = await getOrCreateActiveStore();
       targetStoreId = activeStore.id;
@@ -214,8 +226,8 @@ router.post('/products', async (req, res) => {
     const imagesJson = JSON.stringify(imgList);
 
     const result = await dbAsync.run(
-      `INSERT INTO products (store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, image_url, images_json) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO products (store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, image_url, images_json, is_active) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         targetStoreId,
         title_uz || 'Mahsulot',
@@ -229,6 +241,7 @@ router.post('/products', async (req, res) => {
         imagesJson
       ]
     );
+
 
     // Send response FIRST, then broadcast (non-blocking)
     res.json({ success: true, product_id: result.lastID, message: "Mahsulot qo'shildi!" });
