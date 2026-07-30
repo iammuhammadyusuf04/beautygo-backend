@@ -1,11 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const localtunnel = require('localtunnel');
 require('dotenv').config();
 
 const apiRoutes = require('./server/routes/api');
 const { bot } = require('./server/bot');
+
+// localtunnel faqat development uchun yuklanadi
+let localtunnel = null;
+if (process.env.NODE_ENV !== 'production') {
+  try { localtunnel = require('localtunnel'); } catch(e) {}
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -60,19 +65,33 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 
+// Frontend papkasini aniqlash: 'frontend/' yoki 'public/'
+const fs = require('fs');
+const FRONTEND_DIR = fs.existsSync(path.join(__dirname, 'frontend'))
+  ? path.join(__dirname, 'frontend')
+  : path.join(__dirname, 'public');
+console.log(`📁 Frontend papkasi: ${FRONTEND_DIR}`);
+
 // Routes
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-app.get('/superadmin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'superadmin.html')));
-app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => res.sendFile(path.join(FRONTEND_DIR, 'index.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(FRONTEND_DIR, 'admin.html')));
+app.get('/superadmin', (req, res) => res.sendFile(path.join(FRONTEND_DIR, 'superadmin.html')));
+app.use(express.static(FRONTEND_DIR));
 app.use('/api', apiRoutes);
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('*', (req, res) => {
+  const indexFile = path.join(FRONTEND_DIR, 'index.html');
+  if (fs.existsSync(indexFile)) {
+    res.sendFile(indexFile);
+  } else {
+    res.json({ status: 'BeautyGo API is running', frontend: 'Not found' });
+  }
+});
 
 // ===== LOCALTUNNEL (Faqat development/test uchun) =====
 let tunnelInstance = null;
 
 async function startTunnel() {
-  if (IS_PRODUCTION) return; // Production'da tunnel kerak emas!
+  if (IS_PRODUCTION || !localtunnel) return;
 
   try {
     if (tunnelInstance) {
@@ -84,15 +103,12 @@ async function startTunnel() {
       subdomain: 'beautygo-v2-1812245206'
     });
 
-
     const newUrl = tunnelInstance.url;
     process.env.WEBAPP_URL = newUrl;
     console.log(`===================================================`);
     console.log(`🌐 [TEST] Localtunnel URL: ${newUrl}`);
-    console.log(`⚠️  Bu faqat test uchun! VPS uchun deploy.sh ishlatiladi`);
     console.log(`===================================================`);
 
-    // Notify super admin of new URL
     setTimeout(async () => {
       if (bot) {
         try {
