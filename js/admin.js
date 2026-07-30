@@ -15,14 +15,25 @@ let uploadedImagesList = [];
 
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 
-// Universal Localtunnel Password Bypass Fetch Wrapper
-async function apiFetch(url, options = {}) {
-  options.headers = {
-    'Bypass-Tunnel-Reminder': 'true',
-    ...(options.headers || {})
-  };
-  return fetch(url, options);
+// Universal Fetch Wrapper with Production API prefix and Auto-Retry
+async function apiFetch(url, options = {}, retries = 3) {
+  let targetUrl = url;
+  if (!url.startsWith('http')) {
+    const baseUrl = (window.API_BASE_URL || localStorage.getItem('BG_BACKEND_URL') || 'https://beautygo-backend-p5q9.onrender.com').replace(/\/+$/, '');
+    targetUrl = baseUrl ? `${baseUrl}${url}` : url;
+  }
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(targetUrl, options);
+      return res;
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
 }
+
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
