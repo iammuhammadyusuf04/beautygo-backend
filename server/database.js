@@ -1,8 +1,21 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
+
+const dbDir = path.dirname(path.join(__dirname, 'beauty_market.db'));
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 
 const dbPath = path.join(__dirname, 'beauty_market.db');
-const db = new sqlite3.Database(dbPath);
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('⚠️ SQLite DB Open Warning:', err.message);
+  } else {
+    console.log('✅ SQLite DB Connected Successfully!');
+  }
+});
+
 
 // Initialize Tables & Auto-Migrations
 db.serialize(() => {
