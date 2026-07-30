@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>BeautyGo - Do'kon Egasi Paneli</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+  </script>
+  <script src="js/config.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap');
+    :root {
+      --primary-pink: #FF4D8D; --deep-magenta: #C13584;
+      --accent-gold: #FFD700;
+      --bg-gradient: linear-gradient(135deg, #18091C 0%, #0D040F 50%, #220A21 100%);
+      --card-glass: rgba(255,255,255,0.06);
+      --glass-border: rgba(255,77,141,0.2);
+      --text-main: #FFFFFF; --text-muted: #D1B3C4;
+      --font-title: 'Outfit',sans-serif; --font-body: 'Inter',sans-serif;
+      --radius-lg: 20px; --radius-md: 14px; --radius-sm: 10px;
+      --shadow-pink: 0 8px 25px rgba(255,77,141,0.25);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:var(--font-body); -webkit-tap-highlight-color:transparent; }
+    body { background:var(--bg-gradient); color:var(--text-main); min-height:100vh; padding-bottom:40px; overflow-x:hidden; }
+    .app-container { max-width:500px; margin:0 auto; padding:16px; }
+    .brand-title { font-family:var(--font-title); font-size:22px; font-weight:800; background:linear-gradient(135deg,#FFF 30%,var(--primary-pink) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .lang-btn { background:rgba(255,77,141,0.2); border:1px solid var(--primary-pink); color:var(--primary-pink); padding:5px 12px; border-radius:6px; cursor:pointer; font-weight:700; font-size:12px; }
+    .admin-card { background:var(--card-glass); border:1px solid var(--glass-border); border-radius:var(--radius-lg); padding:16px; margin-bottom:16px; }
+    .stat-box { background:rgba(255,255,255,0.04); border:1px solid rgba(255,77,141,0.15); border-radius:var(--radius-md); padding:12px 8px; text-align:center; }
+    .stat-val { font-family:var(--font-title); font-size:13px; font-weight:700; color:var(--primary-pink); }
+    .stat-lbl { font-size:10px; color:var(--text-muted); margin-top:2px; }
+    .role-btn { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:6px 12px; border-radius:20px; font-size:12px; cursor:pointer; transition:all 0.2s; }
+    .add-btn { background:linear-gradient(135deg,var(--primary-pink),var(--deep-magenta)); color:#fff; border:none; border-radius:10px; padding:6px 14px; height:32px; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+    .btn-primary { width:100%; background:linear-gradient(135deg,var(--primary-pink),var(--deep-magenta)); color:#FFF; border:none; padding:14px; border-radius:var(--radius-md); font-size:14px; font-weight:700; cursor:pointer; box-shadow:var(--shadow-pink); }
+    .form-group { margin-bottom:14px; }
+    .form-label { display:block; font-size:12px; color:var(--text-muted); margin-bottom:6px; }
+    .form-input, .form-select, .form-textarea { width:100%; background:rgba(0,0,0,0.4); border:1px solid var(--glass-border); color:#FFF; padding:10px 14px; border-radius:var(--radius-sm); font-size:13px; outline:none; }
+    .form-input:focus, .form-textarea:focus { border-color:var(--primary-pink); }
+    .order-badge { padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; display:inline-block; }
+    .order-badge.PENDING { background:rgba(255,215,0,0.2); color:#FFD700; border:1px solid #FFD700; }
+    .order-badge.APPROVED { background:rgba(46,204,113,0.2); color:#2ECC71; border:1px solid #2ECC71; }
+    .order-badge.CANCELLED { background:rgba(231,76,60,0.2); color:#E74C3C; border:1px solid #E74C3C; }
+
+    /* Modal - 100% Telegram WebApp Touch Compatible */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(10,4,12,0.92);
+      z-index: 99999;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-content {
+      background: #1C0A1E;
+      border-top: 2px solid var(--primary-pink);
+      border-radius: 28px 28px 0 0;
+      width: 100%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 56px 20px 24px;
+      position: relative;
+    }
+    .modal-close {
+      position: absolute;
+      top: 14px; right: 14px;
+      background: rgba(18,9,20,0.95);
+      border: 1.5px solid var(--primary-pink);
+      color: #FFF;
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      font-size: 20px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; z-index: 10;
+    }
+    .modal-close:active { background: var(--primary-pink); }
+  </style>
+</head>
+<body>
+<div class="app-container">
+
+  <!-- Header -->
+  <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <img src="images/logo.jpg" style="width:36px; height:36px; object-fit:contain; border-radius:10px; border:1px solid rgba(255,255,255,0.15);">
+      <span class="brand-title">BeautyGo Do'kon Boshqaruvi</span>
+    </div>
+    <button class="lang-btn" id="langBtn" onclick="toggleLang()">UZ</button>
+  </header>
+
+  <!-- Store Card -->
+  <div class="admin-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <img id="adminLogoDisplay" src="images/logo.jpg" style="width:44px; height:44px; border-radius:50%; object-fit:cover; border:2px solid var(--primary-pink);">
+        <h2 style="font-family:var(--font-title); font-size:16px;" id="adminStoreName">Do'kon Boshqaruvi</h2>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="role-btn" id="btnEditStore">
+          <i class="fa-solid fa-pen"></i> Tahrirlash
+        </button>
+        <button class="add-btn" id="btnAddProduct">
+          <i class="fa-solid fa-plus"></i> Qo'shish
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:10px;">
+      <div class="stat-box">
+        <div class="stat-val" id="statSales">0</div>
+        <div class="stat-lbl">Jami Sotuvlar</div>
+      </div>
+      <div class="stat-box" style="border-color:#2ECC71;">
+        <div class="stat-val" style="color:#2ECC71;" id="statNetEarnings">0</div>
+        <div class="stat-lbl">Sof Daromadingiz</div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px;">
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:12px;" id="statCommDue">0</div>
+        <div class="stat-lbl">Super Admin Haqqi</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:12px; color:#2ECC71;" id="statPaidOut">0</div>
+        <div class="stat-lbl">Berilgan Pul</div>
+      </div>
+      <div class="stat-box" style="border-color:var(--accent-gold);">
+        <div class="stat-val" style="font-size:12px; color:var(--accent-gold);" id="statRemainingDue">0</div>
+        <div class="stat-lbl">Qolgan Qarz</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Orders -->
+  <h3 style="font-size:15px; margin:20px 0 10px;">📦 Do'kon Buyurtmalari</h3>
+  <div id="storeOrdersList"></div>
+
+  <!-- Products -->
+  <h3 style="font-size:15px; margin:24px 0 10px;">🛍️ Mahsulotlar Ro'yxati</h3>
+  <div id="storeProductsList"></div>
+
+</div>
+
+<!-- Modal: Store Profile Editor -->
+<div class="modal-overlay" id="storeProfileModal">
+  <div class="modal-content">
+    <button class="modal-close" id="closeStoreModal">&#x2715;</button>
+    <h2 style="font-family:var(--font-title); font-size:18px; margin-bottom:16px;">Do'kon Profilini Tahrirlash</h2>
+    <form id="storeProfileForm">
+      <div class="form-group">
+        <label class="form-label">Do'kon Nomi</label>
+        <input type="text" class="form-input" id="editStoreNameInput" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Do'kon Tavsifi</label>
+        <textarea class="form-textarea" id="editStoreDescInput" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Do'kon Logosi (Rasm tanlang)</label>
+        <input type="file" class="form-input" accept="image/*" id="storeLogoFile">
+        <input type="hidden" id="editStoreLogoUrl">
+        <div id="storeLogoPreviewContainer" style="margin-top:8px; display:none;">
+          <img id="storeLogoPreview" src="" style="width:56px; height:56px; object-fit:cover; border-radius:50%; border:2px solid var(--primary-pink);">
+        </div>
+      </div>
+      <button type="submit" class="btn-primary" id="btnSaveStore">Saqlash</button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Add / Edit Product -->
+<div class="modal-overlay" id="productEditModal">
+  <div class="modal-content">
+    <button class="modal-close" id="closeProductModal">&#x2715;</button>
+    <h2 style="font-family:var(--font-title); font-size:18px; margin-bottom:16px;" id="editModalTitle">Yangi Mahsulot Qo'shish</h2>
+    <form id="productForm">
+      <input type="hidden" id="editProductId">
+      <div class="form-group">
+        <label class="form-label">Nomi (O'zbekcha)</label>
+        <input type="text" class="form-input" id="prodTitleUz" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nomi (Ruscha)</label>
+        <input type="text" class="form-input" id="prodTitleRu">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Narxi (So'm)</label>
+        <input type="number" class="form-input" id="prodPrice" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kategoriya</label>
+        <select class="form-select" id="prodCategory">
+          <option value="Parfyum">Parfyum</option>
+          <option value="Kosmetika">Kosmetika</option>
+          <option value="Teri parvarishi">Teri parvarishi</option>
+          <option value="Kiyimlar">Kiyimlar</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">O'lchamlar (Vergul bilan: S, M, L yoki 50ml)</label>
+        <input type="text" class="form-input" id="prodSizes" placeholder="S, M, L">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tavsif</label>
+        <textarea class="form-textarea" id="prodDescUz" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mahsulot Rasmlari (Bir nechta tanlang)</label>
+        <input type="file" class="form-input" id="prodImageFile" multiple accept="image/*">
+        <div id="multiImagePreviewContainer" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;"></div>
+      </div>
+      <button type="submit" class="btn-primary" id="btnSaveProduct">Saqlash</button>
+    </form>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// BeautyGo Admin Panel - Inline Self-Contained Script
+// =====================================================
+
+const tg = window.Telegram ? window.Telegram.WebApp : null;
+
+let currentUser = { telegram_id: '8888888', username: 'beauty_owner', full_name: "Do'kon Egasi", role: 'ADMIN' };
+let userStore = { id: 4, store_name: "Ms beauty", description: "Qizlar asallar", logo_url: "images/logo.jpg" };
+let uploadedImagesList = [];
+
+// Universal fetch wrapper — supports dynamic backend URL for Netlify
+function apiFetch(url, opts = {}) {
+  let targetUrl = url;
+  if (!url.startsWith('http')) {
+    const baseUrl = (window.API_BASE_URL || localStorage.getItem('BG_BACKEND_URL') || 'https://beautygo-backend-p5q9.onrender.com').replace(/\/+$/, '');
+    targetUrl = baseUrl ? `${baseUrl}${url}` : url;
+  }
+  opts.headers = Object.assign({ 'Bypass-Tunnel-Reminder': 'true' }, opts.headers || {});
+  return fetch(targetUrl, opts);
+}
+
+
+
+
+
+
+
+
+
+
+
+// ---- MODAL OPEN/CLOSE ----
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('active');
+}
+
+// ---- BUTTON LOADING STATE ----
+function setBtnLoading(btn, loading, txt) {
+  if (!btn) return;
+  if (loading) {
+    btn.dataset.orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + (txt || 'Yuklanmoqda...');
+    btn.style.opacity = '0.7';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.orig || txt || 'OK';
+    btn.style.opacity = '1';
+  }
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---- IMAGE COMPRESSOR ----
+function compressImageFile(file, maxSize, quality) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize; }
+        if (h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality || 0.75));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---- LOAD DASHBOARD ----
+async function loadDashboard() {
+  const storeId = userStore.id || 4;
+  try {
+    const statsRes = await apiFetch('/api/admin/store-stats/' + storeId);
+    const stats = await statsRes.json();
+
+    if (stats.success && stats.store) {
+      userStore = stats.store;
+      const sid = stats.store.id;
+
+      document.getElementById('adminStoreName').textContent = stats.store.store_name || 'Ms beauty';
+      document.getElementById('adminLogoDisplay').src = stats.store.logo_url || 'images/logo.jpg';
+      document.getElementById('statSales').textContent = (stats.total_sales || 0).toLocaleString() + " so'm";
+      document.getElementById('statNetEarnings').textContent = (stats.net_owner_earnings || 0).toLocaleString() + " so'm";
+      document.getElementById('statCommDue').textContent = (stats.total_commission_due || 0).toLocaleString() + " so'm";
+      document.getElementById('statPaidOut').textContent = (stats.total_paid_out || 0).toLocaleString() + " so'm";
+      document.getElementById('statRemainingDue').textContent = (stats.remaining_balance || 0).toLocaleString() + " so'm";
+
+      const [ordRes, prodRes] = await Promise.all([
+        apiFetch('/api/orders/store/' + sid),
+        apiFetch('/api/products?store_id=' + sid)
+      ]);
+      const ordData = await ordRes.json();
+      const prodData = await prodRes.json();
+
+      // Orders
+      const ordList = document.getElementById('storeOrdersList');
+      if (!ordData.orders || ordData.orders.length === 0) {
+        ordList.innerHTML = '<div style="text-align:center;padding:20px;color:#D1B3C4;">Hali buyurtmalar kelib tushmadi</div>';
+      } else {
+        ordList.innerHTML = ordData.orders.map(o => `
+          <div class="admin-card">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-weight:700;font-size:14px;">#${o.id} | ${escHtml(o.customer_name)}</span>
+              <span class="order-badge ${o.status}">${o.status}</span>
+            </div>
+            <div style="font-size:12px;color:#D1B3C4;">Tel: ${escHtml(o.customer_phone)}</div>
+            ${o.customer_note ? `<div style="font-size:12px;color:#FFD700;margin-top:4px;">💬 ${escHtml(o.customer_note)}</div>` : ''}
+            <div style="font-size:14px;font-weight:800;color:#FF4D8D;margin:6px 0;">${o.total_price.toLocaleString()} so'm</div>
+            ${o.status === 'PENDING' ? `
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <button class="role-btn" style="background:#2ECC71;" data-order="${o.id}" data-status="APPROVED">✅ Tasdiqlash</button>
+                <button class="role-btn" style="background:#E74C3C;" data-order="${o.id}" data-status="CANCELLED">❌ Bekor qilish</button>
+              </div>` : ''}
+          </div>`).join('');
+
+        // Bind order buttons with event delegation (no inline onclick)
+        ordList.querySelectorAll('[data-order]').forEach(btn => {
+          btn.addEventListener('click', function() {
+            updateOrderStatus(this.dataset.order, this.dataset.status);
+          });
+        });
+      }
+
+      // Products
+      const prodList = document.getElementById('storeProductsList');
+      if (!prodData.products || prodData.products.length === 0) {
+        prodList.innerHTML = '<div style="text-align:center;padding:20px;color:#D1B3C4;">Sizda hali mahsulotlar mavjud emas</div>';
+      } else {
+        prodList.innerHTML = prodData.products.map(p => `
+          <div style="display:flex;gap:12px;align-items:center;background:rgba(255,255,255,0.04);padding:10px;border-radius:12px;margin-bottom:8px;">
+            <img src="${p.image_url || 'images/logo.jpg'}" style="width:45px;height:45px;object-fit:cover;border-radius:8px;">
+            <div style="flex-grow:1;">
+              <div style="font-size:13px;font-weight:600;">${escHtml(p.title_uz)}</div>
+              <div style="font-size:11px;color:#FF4D8D;">${p.price.toLocaleString()} so'm</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="role-btn" style="background:#FF4D8D;padding:6px 10px;" data-edit="${p.id}"><i class="fa-solid fa-pen"></i></button>
+              <button class="role-btn" style="background:#E74C3C;padding:6px 10px;" data-del="${p.id}"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>`).join('');
+
+        prodList.querySelectorAll('[data-edit]').forEach(btn => {
+          btn.addEventListener('click', function() { openEditProductModal(this.dataset.edit); });
+        });
+        prodList.querySelectorAll('[data-del]').forEach(btn => {
+          btn.addEventListener('click', function() { deleteProduct(this.dataset.del); });
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Dashboard load error:', err);
+  }
+}
+
+// ---- ORDER STATUS UPDATE ----
+async function updateOrderStatus(orderId, status) {
+  await apiFetch('/api/orders/' + orderId + '/status', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  loadDashboard();
+}
+
+// ---- DELETE PRODUCT ----
+async function deleteProduct(productId) {
+  if (!confirm("Mahsulotni o'chirmoqchimisiz?")) return;
+  await apiFetch('/api/products/' + productId, { method: 'DELETE' });
+  loadDashboard();
+}
+
+// ---- OPEN EDIT PRODUCT MODAL ----
+async function openEditProductModal(productId) {
+  try {
+    const res = await apiFetch('/api/products/' + productId);
+    const data = await res.json();
+    if (!data.success) return;
+    const p = data.product;
+    document.getElementById('editProductId').value = p.id;
+    document.getElementById('prodTitleUz').value = p.title_uz || '';
+    document.getElementById('prodTitleRu').value = p.title_ru || '';
+    document.getElementById('prodPrice').value = p.price || '';
+    document.getElementById('prodCategory').value = p.category || 'Parfyum';
+    document.getElementById('prodSizes').value = (p.sizes || []).join(', ');
+    document.getElementById('prodDescUz').value = p.description_uz || '';
+    uploadedImagesList = (p.images && p.images.length > 0) ? p.images : [p.image_url];
+    renderImagePreviews();
+    document.getElementById('editModalTitle').textContent = 'Mahsulotni Tahrirlash';
+    openModal('productEditModal');
+  } catch(e) { console.error(e); }
+}
+
+// ---- IMAGE PREVIEWS ----
+function renderImagePreviews() {
+  const c = document.getElementById('multiImagePreviewContainer');
+  c.innerHTML = uploadedImagesList.map((img, idx) => `
+    <div style="position:relative;width:65px;height:65px;">
+      <img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;border:1px solid #FF4D8D;">
+      <button type="button" data-rmidx="${idx}" style="position:absolute;top:-6px;right:-6px;background:#E74C3C;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;font-weight:700;">&#x2715;</button>
+    </div>`).join('');
+  c.querySelectorAll('[data-rmidx]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      uploadedImagesList.splice(+this.dataset.rmidx, 1);
+      renderImagePreviews();
+    });
+  });
+}
+
+// ===================== EVENT LISTENERS (No inline onclick!) =====================
+
+document.addEventListener('DOMContentLoaded', async function() {
+  // Read Telegram user
+  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+    const u = tg.initDataUnsafe.user;
+    currentUser.telegram_id = String(u.id);
+    currentUser.username = u.username || '';
+    currentUser.full_name = ((u.first_name || '') + ' ' + (u.last_name || '')).trim();
+  }
+
+  // Init user
+  try {
+    const res = await apiFetch('/api/init-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentUser)
+    });
+    const data = await res.json();
+    if (data.success) {
+      currentUser = data.user;
+      if (data.store) userStore = data.store;
+    }
+  } catch(e) { console.error('init-user error:', e); }
+
+  await loadDashboard();
+
+  // ---- Tahrirlash (Store Profile) button ----
+  document.getElementById('btnEditStore').addEventListener('click', function() {
+    document.getElementById('editStoreNameInput').value = userStore.store_name || '';
+    document.getElementById('editStoreDescInput').value = userStore.description || '';
+    document.getElementById('editStoreLogoUrl').value = userStore.logo_url || '';
+    if (userStore.logo_url) {
+      document.getElementById('storeLogoPreview').src = userStore.logo_url;
+      document.getElementById('storeLogoPreviewContainer').style.display = 'block';
+    }
+    openModal('storeProfileModal');
+  });
+
+  // ---- +Qo'shish (New Product) button ----
+  document.getElementById('btnAddProduct').addEventListener('click', function() {
+    document.getElementById('productForm').reset();
+    document.getElementById('editProductId').value = '';
+    uploadedImagesList = [];
+    renderImagePreviews();
+    document.getElementById('editModalTitle').textContent = "Yangi Mahsulot Qo'shish";
+    openModal('productEditModal');
+  });
+
+  // ---- Close Modal Buttons ----
+  document.getElementById('closeStoreModal').addEventListener('click', function() {
+    closeModal('storeProfileModal');
+  });
+  document.getElementById('closeProductModal').addEventListener('click', function() {
+    closeModal('productEditModal');
+  });
+
+  // ---- Click outside modal to close ----
+  document.getElementById('storeProfileModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal('storeProfileModal');
+  });
+  document.getElementById('productEditModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal('productEditModal');
+  });
+
+  // ---- Lang Button ----
+  document.getElementById('langBtn').addEventListener('click', function() {
+    this.textContent = this.textContent === 'UZ' ? 'RU' : 'UZ';
+  });
+
+  // ---- Store Logo File Picker ----
+  document.getElementById('storeLogoFile').addEventListener('change', async function() {
+    if (!this.files[0]) return;
+    const dataUrl = await compressImageFile(this.files[0], 150, 0.65);
+    document.getElementById('editStoreLogoUrl').value = dataUrl;
+    document.getElementById('storeLogoPreview').src = dataUrl;
+    document.getElementById('storeLogoPreviewContainer').style.display = 'block';
+  });
+
+
+  // ---- Product Images File Picker ----
+  document.getElementById('prodImageFile').addEventListener('change', async function() {
+    for (const file of this.files) {
+      const dataUrl = await compressImageFile(file, 320, 0.65);
+      uploadedImagesList.push(dataUrl);
+    }
+    renderImagePreviews();
+  });
+
+
+  // ---- Save Store Profile Form ----
+  document.getElementById('storeProfileForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSaveStore');
+    setBtnLoading(btn, true, 'Saqlanmoqda...');
+    try {
+      const res = await apiFetch('/api/admin/store-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_id: userStore.id,
+          store_name: document.getElementById('editStoreNameInput').value,
+          description: document.getElementById('editStoreDescInput').value,
+          logo_url: document.getElementById('editStoreLogoUrl').value
+        })
+      });
+      const data = await res.json();
+      setBtnLoading(btn, false);
+      if (data.success) {
+        closeModal('storeProfileModal');
+        await loadDashboard();
+      } else { alert(data.error || 'Xatolik'); }
+    } catch(err) { setBtnLoading(btn, false); alert('Xatolik: ' + err.message); }
+  });
+
+  // ---- Save Product Form ----
+  document.getElementById('productForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSaveProduct');
+    setBtnLoading(btn, true, 'Saqlanmoqda...');
+    const editId = document.getElementById('editProductId').value;
+    const payload = {
+      store_id: userStore.id,
+      title_uz: document.getElementById('prodTitleUz').value,
+      title_ru: document.getElementById('prodTitleRu').value || document.getElementById('prodTitleUz').value,
+      price: document.getElementById('prodPrice').value,
+      category: document.getElementById('prodCategory').value,
+      sizes: document.getElementById('prodSizes').value.split(',').map(s => s.trim()).filter(Boolean),
+      description_uz: document.getElementById('prodDescUz').value,
+      description_ru: document.getElementById('prodDescUz').value,
+      images: uploadedImagesList.length > 0 ? uploadedImagesList : [
+        'https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=450&q=80'
+      ]
+    };
+    const url = editId ? '/api/products/' + editId : '/api/products';
+    const method = editId ? 'PUT' : 'POST';
+    try {
+      const res = await apiFetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setBtnLoading(btn, false);
+      if (data.success) {
+        alert(editId ? 'Mahsulot tahrirlandi!' : 'Mahsulot qoshildi va obunachilarga xabar yuborildi!');
+        closeModal('productEditModal');
+        await loadDashboard();
+      } else { alert(data.error || 'Xatolik yuz berdi'); }
+    } catch(err) { setBtnLoading(btn, false); alert('Xatolik: ' + err.message); }
+  });
+});
+</script>
+</body>
+</html>
