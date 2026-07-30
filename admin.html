@@ -235,16 +235,25 @@ let currentUser = { telegram_id: '8888888', username: 'beauty_owner', full_name:
 let userStore = { id: 4, store_name: "Ms beauty", description: "Qizlar asallar", logo_url: "images/logo.jpg" };
 let uploadedImagesList = [];
 
-// Universal fetch wrapper — supports dynamic backend URL for Netlify
-function apiFetch(url, opts = {}) {
+// Universal fetch wrapper with Production API prefix and Auto-Retry
+async function apiFetch(url, opts = {}, retries = 3) {
   let targetUrl = url;
   if (!url.startsWith('http')) {
     const baseUrl = (window.API_BASE_URL || localStorage.getItem('BG_BACKEND_URL') || 'https://beautygo-backend-p5q9.onrender.com').replace(/\/+$/, '');
     targetUrl = baseUrl ? `${baseUrl}${url}` : url;
   }
-  opts.headers = Object.assign({ 'Bypass-Tunnel-Reminder': 'true' }, opts.headers || {});
-  return fetch(targetUrl, opts);
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(targetUrl, opts);
+      return res;
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
 }
+
 
 
 
