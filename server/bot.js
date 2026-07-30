@@ -23,10 +23,11 @@ function escapeMarkdown(str) {
 }
 
 function getValidWebAppUrl(pathSuffix = '') {
-  let url = process.env.NETLIFY_URL || 'https://symphonious-narwhal-e76970.netlify.app';
+  let url = process.env.NETLIFY_URL || 'https://beautygo-frontend.onrender.com';
   url = url.trim().replace(/\/+$/, '');
   return pathSuffix ? `${url}${pathSuffix}` : url;
 }
+
 
 
 
