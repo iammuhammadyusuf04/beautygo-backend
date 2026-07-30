@@ -104,19 +104,21 @@ router.get('/products', async (req, res) => {
     let params = [];
 
     if (category && category !== 'All') {
-      sql += ' AND p.category = ?';
       params.push(category);
+      sql += ` AND (p.category = $${params.length}::text OR LOWER(p.category) = LOWER($${params.length}::text))`;
     }
     if (store_id) {
-      sql += ' AND p.store_id = ?';
       params.push(store_id);
+      sql += ` AND (p.store_id = $${params.length} OR p.store_id::text = $${params.length}::text)`;
     }
     if (search) {
-      sql += ' AND (p.title_uz LIKE ? OR p.title_ru LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      params.push(`%${search}%`);
+      const searchIdx = params.length;
+      sql += ` AND (p.title_uz ILIKE $${searchIdx}::text OR p.title_ru ILIKE $${searchIdx}::text)`;
     }
 
     sql += ' ORDER BY p.id DESC';
+
 
     const products = await dbAsync.all(sql, params);
 
