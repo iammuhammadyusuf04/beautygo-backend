@@ -12,7 +12,16 @@ const PORT = process.env.PORT || 3000;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const SUPER_ADMIN_ID = '1812245206';
 
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Global Uncaught Exception (handled safely):', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ Global Unhandled Rejection (handled safely):', reason);
+});
+
 // CORS & Preflight Middleware
+
 app.use(cors());
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
