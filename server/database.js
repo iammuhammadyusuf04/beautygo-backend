@@ -236,6 +236,16 @@ async function initPg() {
   );
   await pool.end();
 
+  // Auto-repair orphaned products & is_active status
+  try {
+    const { Pool } = require('pg');
+    const pPool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    await pPool.query(`UPDATE products SET is_active = 1 WHERE is_active IS NULL OR is_active = 0`);
+    await pPool.query(`UPDATE products SET store_id = (SELECT id FROM stores ORDER BY id DESC LIMIT 1) WHERE store_id NOT IN (SELECT id FROM stores)`);
+    await pPool.end();
+    console.log('✅ Product auto-repair completed.');
+  } catch(e) {}
+
   // Seed only if empty
   const countRow = await dbAsync.get('SELECT COUNT(*) as count FROM stores');
   const storeCount = parseInt(countRow?.count || 0);
@@ -246,6 +256,7 @@ async function initPg() {
     console.log(`✅ DB ready with ${storeCount} stores.`);
   }
 }
+
 
 async function seedPg() {
   const { Pool } = require('pg');
