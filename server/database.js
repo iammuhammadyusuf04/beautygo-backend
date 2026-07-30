@@ -121,9 +121,10 @@ db.serialize(() => {
 });
 
 function seedInitialData() {
-  db.get("SELECT COUNT(*) as count FROM users WHERE role = 'SUPER_ADMIN'", (err, row) => {
+  db.get("SELECT COUNT(*) as count FROM stores", (err, row) => {
     if (err) return;
-    if (row && row.count === 0) {
+    if (!row || row.count === 0) {
+
       db.run(
         "INSERT OR REPLACE INTO users (telegram_id, username, full_name, role, language) VALUES (?, ?, ?, ?, ?)",
         ['1812245206', 'Muhammadyusuf', 'Muhammadyusuf (Super Admin)', 'SUPER_ADMIN', 'uz']
