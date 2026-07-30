@@ -73,32 +73,14 @@ router.post('/init-user', async (req, res) => {
       user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [tid]);
     } else {
       if (isSuperAdmin && user.role !== 'SUPER_ADMIN') {
-        await dbAsync.run('UPDATE users SET role = "SUPER_ADMIN" WHERE telegram_id = ?', [tid]);
+        await dbAsync.run('UPDATE users SET role = $1 WHERE telegram_id = $2', ['SUPER_ADMIN', tid]);
         user.role = 'SUPER_ADMIN';
       } else if (isStoreOwner && user.role === 'USER') {
-        await dbAsync.run('UPDATE users SET role = "ADMIN" WHERE telegram_id = ?', [tid]);
+        await dbAsync.run('UPDATE users SET role = $1 WHERE telegram_id = $2', ['ADMIN', tid]);
         user.role = 'ADMIN';
       }
     }
 
-    const returnStore = (user.role === 'ADMIN' && ownedStore) ? ownedStore : activeStore;
-
-    res.json({ success: true, user, store: returnStore });
-  } catch (err) {
-    console.error('init-user error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-        user.role = 'SUPER_ADMIN';
-      } else if (isStoreOwner && user.role === 'USER') {
-        // Only upgrade to ADMIN if they actually own a store
-        await dbAsync.run('UPDATE users SET role = "ADMIN" WHERE telegram_id = ?', [tid]);
-        user.role = 'ADMIN';
-      }
-    }
-
-    // Return the store that belongs to this user (or active store for super admin)
     const returnStore = (user.role === 'ADMIN' && ownedStore) ? ownedStore : activeStore;
 
     res.json({ success: true, user, store: returnStore });
@@ -212,8 +194,6 @@ router.get('/products/:id', async (req, res) => {
 // 4. Product Add / Edit / Delete
 router.post('/products', async (req, res) => {
   try {
-    let { store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, images } = req.body;
-    
     let { store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, images, telegram_id } = req.body;
 
     let targetStoreId = store_id;
@@ -633,8 +613,8 @@ router.post('/super-admin/stores', async (req, res) => {
     const cleanOwnerInput = String(owner_telegram_id).trim().replace(/^@/, '');
 
     let user = await dbAsync.get(
-      'SELECT * FROM users WHERE telegram_id = ? OR (username != "" AND LOWER(username) = LOWER(?))',
-      [cleanOwnerInput, cleanOwnerInput]
+      'SELECT * FROM users WHERE telegram_id = $1 OR (username != $2 AND LOWER(username) = LOWER($3))',
+      [cleanOwnerInput, '', cleanOwnerInput]
     );
 
     if (!user) {
