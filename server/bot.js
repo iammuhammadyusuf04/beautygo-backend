@@ -9,11 +9,18 @@ let bot = null;
 if (BOT_TOKEN) {
   try {
     bot = new TelegramBot(BOT_TOKEN, { polling: true });
+    bot.on('polling_error', (err) => {
+      console.log('⚠️ Telegram bot polling warning:', err.message);
+    });
+    bot.on('error', (err) => {
+      console.log('⚠️ Telegram bot warning:', err.message);
+    });
     console.log('✨ Telegram Bot muvaffaqiyatli ishga tushirildi!');
   } catch (err) {
     console.error('⚠️ Telegram Bot ulanishda xato:', err.message);
   }
 } else {
+
   console.log('ℹ️ BOT_TOKEN o`rnatilmagan. Bot rejimisiz faqat WebApp API ishlaydi.');
 }
 
