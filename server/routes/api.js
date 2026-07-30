@@ -18,7 +18,7 @@ async function getOrCreateActiveStore(ownerTelegramId = '1812245206') {
   return store;
 }
 
-// 1. Init User & Role Check
+// 1. Init User & Role Check (Supports Telegram ID & Username auto-link)
 router.post('/init-user', async (req, res) => {
   try {
     const { telegram_id, username, full_name } = req.body;
@@ -27,37 +27,69 @@ router.post('/init-user', async (req, res) => {
     }
 
     const tid = String(telegram_id);
-    let user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [tid]);
-    
+    const cleanUsername = (username || '').trim().replace(/^@/, '');
+
+    // Search user by telegram_id OR username match
+    let user = await dbAsync.get(
+      'SELECT * FROM users WHERE telegram_id = ? OR (username != "" AND LOWER(username) = LOWER(?))',
+      [tid, cleanUsername]
+    );
+
+    // Auto-link telegram_id if user was originally created by username
+    if (user && user.telegram_id !== tid) {
+      const oldId = user.telegram_id;
+      await dbAsync.run('UPDATE users SET telegram_id = ? WHERE telegram_id = ?', [tid, oldId]);
+      await dbAsync.run('UPDATE stores SET owner_telegram_id = ? WHERE owner_telegram_id = ?', [tid, oldId]);
+      user.telegram_id = tid;
+    }
+
     // Super admin check
-    const isSuperAdmin = (username && username.toLowerCase() === 'muhammadyusuf')
+    const isSuperAdmin = (cleanUsername && cleanUsername.toLowerCase() === 'muhammadyusuf')
       || tid === '1812245206'
       || tid === '7777777';
 
-    // Check if this telegram_id actually owns a store
-    const ownedStore = await dbAsync.get(
-      'SELECT * FROM stores WHERE owner_telegram_id = ?', [tid]
-    );
+    // Check if this user owns any store
+    let ownedStore = await dbAsync.get('SELECT * FROM stores WHERE owner_telegram_id = ?', [tid]);
+    if (!ownedStore && cleanUsername) {
+      ownedStore = await dbAsync.get('SELECT * FROM stores WHERE owner_telegram_id = ?', [cleanUsername]);
+      if (ownedStore) {
+        await dbAsync.run('UPDATE stores SET owner_telegram_id = ? WHERE id = ?', [tid, ownedStore.id]);
+        ownedStore.owner_telegram_id = tid;
+      }
+    }
     const isStoreOwner = !!ownedStore;
 
-    // Get any active store to return (for admin.html fallback)
     const activeStore = await getOrCreateActiveStore(tid);
 
     if (!user) {
-      // New user: assign correct role
       let role = 'USER';
       if (isSuperAdmin) role = 'SUPER_ADMIN';
       else if (isStoreOwner) role = 'ADMIN';
 
       await dbAsync.run(
         'INSERT INTO users (telegram_id, username, full_name, role) VALUES (?, ?, ?, ?)',
-        [tid, username || '', full_name || 'Foydalanuvchi', role]
+        [tid, cleanUsername, full_name || 'Foydalanuvchi', role]
       );
       user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [tid]);
     } else {
-      // Existing user: only upgrade, never downgrade
       if (isSuperAdmin && user.role !== 'SUPER_ADMIN') {
         await dbAsync.run('UPDATE users SET role = "SUPER_ADMIN" WHERE telegram_id = ?', [tid]);
+        user.role = 'SUPER_ADMIN';
+      } else if (isStoreOwner && user.role === 'USER') {
+        await dbAsync.run('UPDATE users SET role = "ADMIN" WHERE telegram_id = ?', [tid]);
+        user.role = 'ADMIN';
+      }
+    }
+
+    const returnStore = (user.role === 'ADMIN' && ownedStore) ? ownedStore : activeStore;
+
+    res.json({ success: true, user, store: returnStore });
+  } catch (err) {
+    console.error('init-user error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
         user.role = 'SUPER_ADMIN';
       } else if (isStoreOwner && user.role === 'USER') {
         // Only upgrade to ADMIN if they actually own a store
@@ -182,24 +214,30 @@ router.post('/products', async (req, res) => {
   try {
     let { store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, images } = req.body;
     
-    if (!store_id) {
-      const activeStore = await getOrCreateActiveStore();
-      store_id = activeStore.id;
+    let { store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, images, telegram_id } = req.body;
+
+    let targetStoreId = store_id;
+
+    // Auto-resolve storeId if missing or unassigned
+    if (telegram_id) {
+      const owned = await dbAsync.get('SELECT id FROM stores WHERE owner_telegram_id = ? ORDER BY id DESC LIMIT 1', [String(telegram_id)]);
+      if (owned) targetStoreId = owned.id;
     }
 
-    // Accept base64 or URL images — store directly, SQLite TEXT has no size limit
-    const imgList = Array.isArray(images) && images.length > 0
-      ? images
-      : ['https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=450&q=80'];
+    if (!targetStoreId) {
+      const activeStore = await getOrCreateActiveStore();
+      targetStoreId = activeStore.id;
+    }
 
-    const coverImage = imgList[0] || '';  // Store base64 or URL directly
+    const imgList = Array.isArray(images) && images.length > 0 ? images : ['https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=450&q=80'];
+    const coverImage = imgList[0] || '';
     const imagesJson = JSON.stringify(imgList);
 
     const result = await dbAsync.run(
       `INSERT INTO products (store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, image_url, images_json) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        store_id,
+        targetStoreId,
         title_uz || 'Mahsulot',
         title_ru || title_uz || 'Mahsulot',
         description_uz || '',
@@ -211,7 +249,6 @@ router.post('/products', async (req, res) => {
         imagesJson
       ]
     );
-
 
     // Send response FIRST, then broadcast (non-blocking)
     res.json({ success: true, product_id: result.lastID, message: "Mahsulot qo'shildi!" });
@@ -587,27 +624,33 @@ router.get('/super-admin/dashboard', async (req, res) => {
 
 router.post('/super-admin/stores', async (req, res) => {
   try {
-    const { owner_telegram_id, store_name, description, logo_url, commission_margin } = req.body;
+    let { owner_telegram_id, store_name, description, logo_url, commission_margin } = req.body;
 
     if (!owner_telegram_id || !store_name) {
-      return res.status(400).json({ error: "owner_telegram_id va store_name majburiy!" });
+      return res.status(400).json({ error: "owner_telegram_id (yoki Telegram Username) va store_name majburiy!" });
     }
 
-    let user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [String(owner_telegram_id)]);
+    const cleanOwnerInput = String(owner_telegram_id).trim().replace(/^@/, '');
+
+    let user = await dbAsync.get(
+      'SELECT * FROM users WHERE telegram_id = ? OR (username != "" AND LOWER(username) = LOWER(?))',
+      [cleanOwnerInput, cleanOwnerInput]
+    );
+
     if (!user) {
       await dbAsync.run(
         'INSERT INTO users (telegram_id, username, full_name, role) VALUES (?, ?, ?, ?)',
-        [String(owner_telegram_id), 'store_owner', store_name + ' Egasi', 'ADMIN']
+        [cleanOwnerInput, cleanOwnerInput, store_name + ' Egasi', 'ADMIN']
       );
     } else {
-      await dbAsync.run('UPDATE users SET role = ? WHERE telegram_id = ?', ['ADMIN', String(owner_telegram_id)]);
+      await dbAsync.run('UPDATE users SET role = ? WHERE telegram_id = ? OR username = ?', ['ADMIN', cleanOwnerInput, cleanOwnerInput]);
     }
 
     const result = await dbAsync.run(
       `INSERT INTO stores (owner_telegram_id, store_name, description, logo_url, commission_margin, status) 
        VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
       [
-        String(owner_telegram_id),
+        cleanOwnerInput,
         store_name,
         description || '',
         logo_url || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=200&q=80',
@@ -615,11 +658,12 @@ router.post('/super-admin/stores', async (req, res) => {
       ]
     );
 
-    res.json({ success: true, store_id: result.lastID, message: "Yangi do'kon va do'kon egasi yaratildi!" });
+    res.json({ success: true, store_id: result.lastID, message: "Yangi do'kon va do'kon egasi muvaffaqiyatli yaratildi!" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Hard Store Deletion (Super Admin) - Removes store, products, and subscriptions permanently & demotes admin role
 router.delete('/super-admin/stores/:id', async (req, res) => {
