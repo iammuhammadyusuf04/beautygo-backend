@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>BeautyGo - Super Admin Portali</title>
+  
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    if (window.Telegram && window.Telegram.WebApp) {
+      try {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      } catch (e) {}
+    }
+  </script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom Glassmorphism Stylesheet -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Brand Header -->
+    <header class="app-header">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="brand-title" style="display:flex; align-items:center; gap:10px;">
+          <img src="images/logo.jpg" style="width:38px; height:38px; object-fit:contain; border-radius:10px; border:1px solid rgba(255,255,255,0.15);">
+          <span>BeautyGo Super Portal</span>
+        </div>
+        <button class="lang-btn" onclick="toggleLang()" id="langBtn" style="padding:5px 12px; font-size:12px; font-weight:700;">UZ</button>
+      </div>
+    </header>
+
+    <!-- Super Admin Portal View -->
+    <section id="superAdminView">
+      <div class="admin-card" style="border-color:var(--accent-gold);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h2 style="font-family:var(--font-title); font-size:18px; color:var(--accent-gold);">👑 Super Admin Portali</h2>
+          <button class="role-btn" style="background:var(--accent-gold); color:#000; font-weight:700;" onclick="openCreateStoreModal()">➕ Yangi Do'kon</button>
+        </div>
+        
+        <!-- Global Platform Financial Ledger -->
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin-bottom:8px;">
+          <div class="stat-box">
+            <div class="stat-val" style="color:var(--accent-gold);" id="superSales">0</div>
+            <div class="stat-lbl">Platforma Sotuvlari</div>
+          </div>
+          <div class="stat-box" style="border-color:#2ECC71;">
+            <div class="stat-val" style="color:#2ECC71;" id="superComm">0</div>
+            <div class="stat-lbl">Jami Komissiya Haqqi</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;">
+          <div class="stat-box">
+            <div class="stat-val" style="color:#2ECC71; font-size:14px;" id="superPaidOut">0</div>
+            <div class="stat-lbl">Super Admin Olingan Pul</div>
+          </div>
+          <div class="stat-box" style="border-color:var(--primary-pink);">
+            <div class="stat-val" style="color:var(--primary-pink); font-size:14px;" id="superRemainingBalance">0</div>
+            <div class="stat-lbl">Qolgan Olinishi Kerak Qarz</div>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="font-size:15px; margin:20px 0 10px;">🛍️ Do'konlar Balansi va Komissiyalar</h3>
+      <div id="superStoresList">
+        <!-- Stores List -->
+      </div>
+
+      <h3 style="font-size:15px; margin:24px 0 10px;">💵 To'lovlar Tarixi</h3>
+      <div id="superPayoutsList">
+        <!-- Payouts history -->
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Modal: Super Admin Create Store -->
+  <div class="modal-overlay" id="createStoreModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('createStoreModal')">&times;</button>
+      <h2 style="font-family:var(--font-title); font-size:18px; margin-bottom:16px;">Yangi Do'kon Qo'shish</h2>
+      <form onsubmit="submitCreateStore(event)">
+        <div class="form-group">
+          <label class="form-label">Do'kon Egasining Telegram ID-si</label>
+          <input type="text" class="form-input" id="newOwnerId" placeholder="99887766" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Do'kon Nomi</label>
+          <input type="text" class="form-input" id="newStoreName" placeholder="Glamour Beauty Cosmetics" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tavsif</label>
+          <input type="text" class="form-input" id="newStoreDesc" placeholder="Luks parfyum va kosmetika">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ustama Komissiya (%)</label>
+          <input type="number" class="form-input" id="newStoreMargin" value="10" step="0.1" required>
+        </div>
+        <button type="submit" class="btn-primary">Do'kon Yaratish</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Record Payout (Super Admin) -->
+  <div class="modal-overlay" id="payoutModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('payoutModal')">&times;</button>
+      <h2 style="font-family:var(--font-title); font-size:18px; margin-bottom:16px;">Pul Olish (Qayd etish)</h2>
+      <form id="payoutForm" onsubmit="submitPayout(event)">
+        <input type="hidden" id="payoutStoreId">
+        <div class="form-group">
+          <label class="form-label">Olingan Summa (So'm)</label>
+          <input type="number" class="form-input" id="payoutAmount" placeholder="4500000" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Izoh</label>
+          <input type="text" class="form-input" id="payoutNote" placeholder="Masalan: Do'kon1 dan 4.5 mln oldim">
+        </div>
+        <button type="submit" class="btn-primary">To'lovni Qayd Etish</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/superadmin.js"></script>
+
+
+</body>
+</html>
