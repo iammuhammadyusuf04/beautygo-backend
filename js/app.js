@@ -17,19 +17,25 @@ let isSubscribedToCurrentStore = false;
 
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 
-// Universal Fetch Wrapper - Supports Cloudflare Tunnel & Netlify
-async function apiFetch(url, options = {}) {
+// Universal Fetch Wrapper with Production API prefix and Auto-Retry
+async function apiFetch(url, options = {}, retries = 3) {
   let targetUrl = url;
   if (!url.startsWith('http')) {
     const baseUrl = (window.API_BASE_URL || localStorage.getItem('BG_BACKEND_URL') || 'https://beautygo-backend-p5q9.onrender.com').replace(/\/+$/, '');
     targetUrl = baseUrl ? `${baseUrl}${url}` : url;
   }
-  options.headers = {
-    'Bypass-Tunnel-Reminder': 'true',
-    ...(options.headers || {})
-  };
-  return fetch(targetUrl, options);
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(targetUrl, options);
+      return res;
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
 }
+
 
 
 
