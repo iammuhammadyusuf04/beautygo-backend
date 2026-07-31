@@ -43,10 +43,10 @@ router.post('/init-user', async (req, res) => {
       user.telegram_id = tid;
     }
 
-    // Super Admin Broadcast (Send message/ad to all bot users)
+    // Super Admin Broadcast (Send message/ad with photo, video, links & buttons to all bot users)
     router.post('/super-admin/broadcast', async (req, res) => {
       try {
-        const { admin_telegram_id, message, image_url } = req.body;
+        const { admin_telegram_id, message, media_type, media_url, button_text, button_url } = req.body;
         
         const tid = String(admin_telegram_id || '');
         const user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [tid]);
@@ -69,21 +69,46 @@ router.post('/init-user', async (req, res) => {
         }
 
         const { bot } = require('../bot');
+        if (!bot) {
+          return res.status(500).json({ error: "Telegram Bot faol emas!" });
+        }
+
+        let replyMarkup = undefined;
+        if (button_text && button_url) {
+          replyMarkup = {
+            inline_keyboard: [
+              [{ text: button_text, url: button_url }]
+            ]
+          };
+        }
+
+        const options = {
+          parse_mode: 'HTML',
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {})
+        };
+
         let sent = 0;
         let failed = 0;
 
+        const effectiveMediaType = media_type || (media_url ? 'photo' : 'none');
+
         for (const u of allUsers) {
           try {
-            if (bot) {
-              if (image_url && image_url.startsWith('http')) {
-                await bot.sendPhoto(u.telegram_id, image_url, { caption: message });
-              } else {
-                await bot.sendMessage(u.telegram_id, message);
-              }
-              sent++;
+            if (effectiveMediaType === 'photo' && media_url) {
+              await bot.sendPhoto(u.telegram_id, media_url, { caption: message, ...options });
+            } else if (effectiveMediaType === 'video' && media_url) {
+              await bot.sendVideo(u.telegram_id, media_url, { caption: message, ...options });
+            } else {
+              await bot.sendMessage(u.telegram_id, message, options);
             }
+            sent++;
           } catch (err) {
-            failed++;
+            try {
+              await bot.sendMessage(u.telegram_id, message, replyMarkup ? { reply_markup: replyMarkup } : undefined);
+              sent++;
+            } catch (retryErr) {
+              failed++;
+            }
           }
         }
 
@@ -92,12 +117,13 @@ router.post('/init-user', async (req, res) => {
           total_users: allUsers.length,
           sent,
           failed,
-          message: `📢 Xabar ${sent} ta foydalanuvchiga muvaffaqiyatli yuborildi!`
+          message: `📢 Reklama e'loni ${sent} ta foydalanuvchiga muvaffaqiyatli yetkazildi (${failed} ta yetmadi).`
         });
       } catch (err) {
         res.status(500).json({ error: err.message });
       }
     });
+
 
     // Super admin check
     const isSuperAdmin = (cleanUsername && cleanUsername.toLowerCase() === 'muhammadyusuf')
