@@ -69,6 +69,18 @@
         </div>
       </div>
 
+      <!-- Broadcast Announcement Card -->
+      <div class="admin-card" style="margin-top:16px; border-color:var(--primary-pink);">
+        <h3 style="font-size:16px; color:var(--primary-pink); margin-bottom:8px;">📢 Bot Foydalanuvchilariga Reklama / Xabar Yuborish</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Botdan foydalangan va /start bosgan barcha mijozlarga e'lon tarqatish.</p>
+        <div class="form-group" style="margin-bottom:10px;">
+          <textarea class="form-textarea" id="broadcastMsgInput" rows="3" placeholder="Masalan: 🌸 Bugun barcha parfyumlarga 20% chegirma! Mini App-da xarid qiling..." style="-webkit-user-select:text; user-select:text;"></textarea>
+        </div>
+        <button class="role-btn" style="background:linear-gradient(135deg, var(--primary-pink), var(--deep-magenta)); width:100%; padding:10px; font-weight:700; font-size:13px;" onclick="submitBroadcastMsg(this)">
+          🚀 Barcha Userlarga Yuborish
+        </button>
+      </div>
+
       <h3 style="font-size:15px; margin:20px 0 10px;">🛍️ Do'konlar Balansi va Komissiyalar</h3>
       <div id="superStoresList">
         <!-- Stores List -->
@@ -79,6 +91,7 @@
         <!-- Payouts history -->
       </div>
     </section>
+
 
   </div>
 
