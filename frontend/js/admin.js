@@ -15,14 +15,25 @@ let uploadedImagesList = [];
 
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 
-// Universal Localtunnel Password Bypass Fetch Wrapper
-async function apiFetch(url, options = {}) {
-  options.headers = {
-    'Bypass-Tunnel-Reminder': 'true',
-    ...(options.headers || {})
-  };
-  return fetch(url, options);
+// Universal Fetch Wrapper with Production API prefix and Auto-Retry
+async function apiFetch(url, options = {}, retries = 3) {
+  let targetUrl = url;
+  if (!url.startsWith('http')) {
+    const baseUrl = (window.API_BASE_URL || localStorage.getItem('BG_BACKEND_URL') || 'https://beautygo-backend-p5q9.onrender.com').replace(/\/+$/, '');
+    targetUrl = baseUrl ? `${baseUrl}${url}` : url;
+  }
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(targetUrl, options);
+      return res;
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
 }
+
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
@@ -152,7 +163,7 @@ async function loadAdminDashboard() {
             const tgLink = o.customer_telegram_id ? `tg://user?id=${o.customer_telegram_id}` : null;
 
             return `
-              <div class="admin-card" style="border-left: 4px solid ${o.status === 'APPROVED' ? '#2ECC71' : (o.status === 'CANCELLED' ? '#E74C3C' : 'var(--accent-gold)')}; cursor:pointer;" onclick="toggleOrderExpand('admin_order_${o.id}')">
+              <div class="admin-card" style="border-left: 4px solid ${o.status === 'APPROVED' ? '#2ECC71' : (o.status === 'CANCELLED' ? '#E74C3C' : 'var(--accent-gold)')};margin-bottom:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                   <span style="font-weight:700; font-size:15px; color:var(--text-light);">#${o.id} | ${escapeHtml(o.customer_name)}</span>
                   <span class="order-badge ${o.status}">${o.status === 'APPROVED' ? '✅ TASDIQLANDI' : (o.status === 'CANCELLED' ? '❌ BEKOR QILINDI' : '⏳ KUTILMOQDA')}</span>
@@ -163,41 +174,42 @@ async function loadAdminDashboard() {
                   ${tgLink ? `<a href="${tgLink}" target="_blank" style="background:rgba(0,136,204,0.2); color:#0088cc; padding:2px 8px; border-radius:6px; font-weight:700; text-decoration:none;" onclick="event.stopPropagation();">💬 Telegram Chat</a>` : ''}
                 </div>
 
-                ${o.customer_note ? `<div style="font-size:12px; color:var(--accent-gold); margin-top:2px; font-weight:600; background:rgba(255,215,0,0.1); padding:4px 8px; border-radius:6px;">💬 Mijoz izohi: "${escapeHtml(o.customer_note)}"</div>` : ''}
+                ${o.customer_note ? `<div style="font-size:12px; color:var(--accent-gold); margin-bottom:8px; font-weight:600; background:rgba(255,215,0,0.1); padding:4px 8px; border-radius:6px;">💬 Mijoz izohi: "${escapeHtml(o.customer_note)}"</div>` : ''}
 
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                  <span style="font-size:14px; font-weight:800; color:var(--primary-pink);">${o.total_price.toLocaleString()} so'm</span>
-                  <span style="font-size:11px; color:var(--text-muted); text-decoration:underline;">Tarkibini ko'rish 👇</span>
-                </div>
-
-                <!-- Expandable Order Items Breakdown -->
-                <div id="admin_order_${o.id}" style="display:none; margin-top:12px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.15);" onclick="event.stopPropagation();">
-                  <div style="font-size:12px; font-weight:700; color:var(--text-light); margin-bottom:6px;">📋 Buyurtma Tarkibi (${items.length} ta tovar):</div>
-                  ${items.map(item => `
-                    <div style="display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.03); padding:6px 10px; border-radius:8px; margin-bottom:6px;">
-                      <img src="${item.image_url || 'images/logo.jpg'}" style="width:38px; height:38px; object-fit:cover; border-radius:6px;">
+                <!-- Order Items — always visible -->
+                <div style="margin-bottom:10px; background:rgba(255,255,255,0.03); border-radius:10px; padding:8px;">
+                  <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">📋 Buyurtma tarkibi (${items.length} ta tovar):</div>
+                  ${items.length > 0 ? items.map(item => `
+                    <div style="display:flex; gap:10px; align-items:center; padding:6px; border-radius:8px; margin-bottom:4px; background:rgba(255,255,255,0.03);">
+                      <img src="${item.image_url || 'images/logo.jpg'}" style="width:40px; height:40px; object-fit:cover; border-radius:7px; border:1px solid rgba(255,255,255,0.1);">
                       <div style="flex-grow:1;">
-                        <div style="font-size:12px; font-weight:600;">${escapeHtml(item.title_uz)}</div>
-                        ${item.size ? `<div style="font-size:10px; color:var(--primary-pink);">${escapeHtml(item.size)}</div>` : ''}
-                        <div style="font-size:11px; color:var(--accent-gold);">${item.quantity} dona x ${item.price.toLocaleString()} so'm</div>
+                        <div style="font-size:12px; font-weight:600; color:var(--text-light);">${escapeHtml(item.title_uz || item.title_ru || 'Mahsulot')}</div>
+                        ${item.size ? `<div style="font-size:10px; color:var(--primary-pink);">📏 ${escapeHtml(item.size)}</div>` : ''}
+                        <div style="font-size:11px; color:var(--accent-gold);">${item.quantity || 1} dona × ${(item.price || 0).toLocaleString()} so'm</div>
                       </div>
-                      <div style="font-size:12px; font-weight:700; color:var(--text-light);">${(item.quantity * item.price).toLocaleString()} so'm</div>
+                      <div style="font-size:12px; font-weight:700; color:var(--primary-pink);">${((item.quantity || 1) * (item.price || 0)).toLocaleString()} so'm</div>
                     </div>
-                  `).join('')}
-
-                  ${o.status === 'PENDING' ? `
-                    <div style="display:flex; gap:8px; margin-top:12px;">
-                      <button class="role-btn" style="flex:1; background:#2ECC71; padding:8px; font-weight:700;" onclick="updateOrderStatus(${o.id}, 'APPROVED')">✅ Tasdiqlash</button>
-                      <button class="role-btn" style="flex:1; background:#E74C3C; padding:8px; font-weight:700;" onclick="updateOrderStatus(${o.id}, 'CANCELLED')">❌ Bekor qilish</button>
-                    </div>
-                  ` : ''}
+                  `).join('') : '<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:8px;">Tarkib ma\'lumoti yo\'q</div>'}
                 </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:${o.status === 'PENDING' ? '10px' : '0'};">
+                  <span style="font-size:15px; font-weight:800; color:var(--primary-pink);">💰 Jami: ${(o.total_price || 0).toLocaleString()} so'm</span>
+                  <span style="font-size:10px; color:var(--text-muted);">📦 ${new Date(o.created_at || Date.now()).toLocaleDateString('uz-UZ', {day:'2-digit', month:'2-digit', year:'numeric'})}</span>
+                </div>
+
+                ${o.status === 'PENDING' ? `
+                  <div style="display:flex; gap:8px;">
+                    <button class="role-btn" style="flex:1; background:#2ECC71; padding:10px; font-weight:700; font-size:13px;" onclick="updateOrderStatus(${o.id}, 'APPROVED')">✅ Tasdiqlash</button>
+                    <button class="role-btn" style="flex:1; background:#E74C3C; padding:10px; font-weight:700; font-size:13px;" onclick="updateOrderStatus(${o.id}, 'CANCELLED')">❌ Bekor qilish</button>
+                  </div>
+                ` : ''}
               </div>
             `;
           }).join('');
 
         }
       }
+
 
       // Render Store Products
       const prodList = document.getElementById('storeProductsList');
@@ -401,6 +413,7 @@ window.saveProduct = async function(e) {
 
   const payload = {
     store_id: storeId,
+    telegram_id: currentUser.telegram_id,
     title_uz: document.getElementById('prodTitleUz').value,
     title_ru: document.getElementById('prodTitleRu').value || document.getElementById('prodTitleUz').value,
     price: document.getElementById('prodPrice').value,
@@ -410,6 +423,7 @@ window.saveProduct = async function(e) {
     description_ru: document.getElementById('prodDescUz').value,
     images: uploadedImagesList.length > 0 ? uploadedImagesList : ['https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=450&q=80']
   };
+
 
   const url = editId ? `/api/products/${editId}` : '/api/products';
   const method = editId ? 'PUT' : 'POST';
