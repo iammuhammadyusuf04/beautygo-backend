@@ -165,9 +165,12 @@ async function loadAdminDashboard() {
             return `
               <div class="admin-card" style="border-left: 4px solid ${o.status === 'APPROVED' ? '#2ECC71' : (o.status === 'CANCELLED' ? '#E74C3C' : 'var(--accent-gold)')};margin-bottom:14px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                  <span style="font-weight:700; font-size:15px; color:var(--text-light);">#${o.id} | ${escapeHtml(o.customer_name)}</span>
+                  <span style="font-weight:700; font-size:15px; color:var(--text-light);">
+                    #${o.id} | <a href="tg://user?id=${o.customer_telegram_id}" target="_blank" style="color:var(--primary-pink); text-decoration:underline;" onclick="event.stopPropagation();">${escapeHtml(o.customer_name)}</a>
+                  </span>
                   <span class="order-badge ${o.status}">${o.status === 'APPROVED' ? '✅ TASDIQLANDI' : (o.status === 'CANCELLED' ? '❌ BEKOR QILINDI' : '⏳ KUTILMOQDA')}</span>
                 </div>
+
 
                 <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; font-size:12px; margin-bottom:8px;">
                   <a href="tel:${escapeHtml(o.customer_phone)}" style="color:var(--text-muted); text-decoration:none;" onclick="event.stopPropagation();">📞 ${escapeHtml(o.customer_phone)}</a>
@@ -232,11 +235,11 @@ async function loadAdminDashboard() {
           `).join('');
         }
       }
-    }
   } catch (err) {
     console.error('Admin dashboard load error:', err);
   }
 }
+
 
 window.toggleOrderExpand = function(id) {
   const el = document.getElementById(id);
