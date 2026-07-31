@@ -45,10 +45,14 @@ async function getRoleKeyboard(telegramId) {
   const isSuperAdmin = String(telegramId) === '1812245206' || (user && user.role === 'SUPER_ADMIN');
   const isAdmin = (user && user.role === 'ADMIN' && ownedStore) || isSuperAdmin;
 
-  // Customer gets main marketplace URL
+  // Customer gets main marketplace & dedicated orders page
   let keyboard = [
-    [{ text: "🌸 BeautyGo Marketpleys", web_app: { url: getValidWebAppUrl('/') } }]
+    [
+      { text: "🌸 BeautyGo Marketpleys", web_app: { url: getValidWebAppUrl('/') } },
+      { text: "📦 Buyurtmalarim", web_app: { url: getValidWebAppUrl('/orders.html') } }
+    ]
   ];
+
 
   // Store Owners get dedicated /admin URL ONLY if they own a store or are SuperAdmin
   if (isAdmin) {
