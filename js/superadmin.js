@@ -5,7 +5,10 @@ let currentUser = {
   full_name: 'Muhammadyusuf (Super Admin)',
   role: 'SUPER_ADMIN'
 };
-let currentLang = 'uz';
+if (typeof currentLang === 'undefined') {
+  var currentLang = 'uz';
+}
+
 
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 
