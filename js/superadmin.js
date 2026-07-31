@@ -334,7 +334,35 @@ window.submitBroadcastMsg = async function(btn) {
   }
 };
 
+window.handleBroadcastFileSelect = function(input) {
+
+  const file = input.files && input.files[0];
+  const statusEl = document.getElementById('broadcastFileStatus');
+  const mediaUrlEl = document.getElementById('broadcastMediaUrl');
+  const mediaTypeEl = document.getElementById('broadcastMediaType');
+
+  if (!file) return;
+
+  if (statusEl) statusEl.textContent = '⏳ Fayl oqilmoqda...';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const dataUrl = e.target.result;
+    if (mediaUrlEl) mediaUrlEl.value = dataUrl;
+    if (mediaTypeEl) {
+      if (file.type.startsWith('video/')) {
+        mediaTypeEl.value = 'video';
+      } else {
+        mediaTypeEl.value = 'photo';
+      }
+    }
+    if (statusEl) statusEl.textContent = '✅ Fayl muvaffaqiyatli tanlandi!';
+  };
+  reader.readAsDataURL(file);
+};
+
 // Modal Helpers
+
 function openModal(id) {
   const el = document.getElementById(id);
   if (el) el.classList.add('active');
