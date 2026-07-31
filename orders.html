@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>BeautyGo - Buyurtmalarim Tarixi</title>
+  
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    if (window.Telegram && window.Telegram.WebApp) {
+      try {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      } catch (e) {}
+    }
+  </script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom Glassmorphism Stylesheet -->
+  <link rel="stylesheet" href="css/styles.css?v=2.0.5">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Brand Header -->
+    <header class="app-header" style="margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="brand-title" style="display:flex; align-items:center; gap:10px;">
+          <img src="images/logo.jpg" style="width:38px; height:38px; object-fit:contain; border-radius:10px; border:1px solid rgba(255,255,255,0.15);">
+          <span>BeautyGo</span>
+        </div>
+        <a href="index.html" class="role-btn" style="background:rgba(255,77,141,0.2); border:1px solid var(--primary-pink); color:var(--primary-pink); padding:6px 14px; text-decoration:none; font-weight:700; font-size:12px; border-radius:8px;">
+          🌸 Katalogga Qaytish
+        </a>
+      </div>
+    </header>
+
+    <!-- Dedicated Orders Title -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="font-family:var(--font-title); font-size:22px; color:var(--text-main); font-weight:700;">
+        📦 Buyurtmalarim Tarixi
+      </h2>
+      <span id="orderCountBadge" style="background:var(--primary-pink); color:#fff; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:700;">0 ta</span>
+    </div>
+
+    <!-- Orders Container -->
+    <div id="ordersListContainer">
+      <div style="text-align:center; padding:50px 20px; color:var(--text-muted);">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size:28px; color:var(--primary-pink); margin-bottom:12px;"></i>
+        <div>Buyurtmalaringiz yuklanmoqda...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Navigation Bar -->
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item">
+      <i class="fa-solid fa-store nav-icon"></i>
+      <span class="nav-label">Katalog</span>
+    </a>
+    <a href="orders.html" class="nav-item active">
+      <i class="fa-solid fa-bag-shopping nav-icon"></i>
+      <span class="nav-label">Buyurtmalar</span>
+    </a>
+  </nav>
+
+  <!-- Scripts -->
+  <script src="js/config.js?v=2.0.5"></script>
+  <script>
+    const tg = window.Telegram ? window.Telegram.WebApp : null;
+    let userTelegramId = '';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Resolve exact telegram_id
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramId = urlParams.get('telegram_id') || urlParams.get('tg_id') || urlParams.get('id');
+
+      if (paramId) {
+        userTelegramId = String(paramId);
+      } else if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+        tg.ready();
+        tg.expand();
+        userTelegramId = String(tg.initDataUnsafe.user.id);
+      } else {
+        // Fallback for standalone browser tab testing
+        let sessionId = sessionStorage.getItem('bg_session_id');
+        if (!sessionId) {
+          sessionId = 'guest_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+          sessionStorage.setItem('bg_session_id', sessionId);
+        }
+        userTelegramId = sessionId;
+      }
+
+      await fetchAndRenderOrders();
+    });
+
+    async function fetchAndRenderOrders() {
+      const container = document.getElementById('ordersListContainer');
+      const badge = document.getElementById('orderCountBadge');
+
+      if (!userTelegramId) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:50px 20px; background:rgba(255,255,255,0.04); border-radius:16px; border:1px solid var(--glass-border);">
+            <div style="font-size:48px; margin-bottom:12px;">⚠️</div>
+            <h3 style="font-size:16px; color:var(--primary-pink); margin-bottom:8px;">Foydalanuvchi Aniqlanmadi</h3>
+            <p style="font-size:13px; color:var(--text-muted);">Buyurtmalaringizni ko'rish uchun iltimos ushbu bot orqali Telegram ilovasidan kiring.</p>
+          </div>
+        `;
+        return;
+      }
+
+      try {
+        const baseUrl = (window.API_BASE_URL || localStorage.getItem('BG_BACKEND_URL') || 'https://beautygo-backend-p5q9.onrender.com').replace(/\/+$/, '');
+        const res = await fetch(`${baseUrl}/api/orders/user/${encodeURIComponent(userTelegramId)}?t=${Date.now()}`);
+        const data = await res.json();
+
+        if (!data.success || !data.orders || data.orders.length === 0) {
+          badge.textContent = '0 ta';
+          container.innerHTML = `
+            <div style="text-align:center; padding:60px 20px; background:rgba(255,255,255,0.04); border-radius:16px; border:1px dashed var(--glass-border);">
+              <div style="font-size:52px; margin-bottom:12px;">🛍️</div>
+              <h3 style="font-size:17px; color:var(--text-main); margin-bottom:6px;">Sizda hali buyurtmalar mavjud emas</h3>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Xaridlaringiz tarixi bu yerda ko'rinadi.</p>
+              <a href="index.html" class="role-btn" style="background:linear-gradient(135deg, var(--primary-pink), var(--deep-magenta)); padding:12px 24px; text-decoration:none; display:inline-block; font-weight:700;">
+                🌸 Xarid qilishni boshlash
+              </a>
+            </div>
+          `;
+          return;
+        }
+
+        badge.textContent = `${data.orders.length} ta`;
+
+        container.innerHTML = data.orders.map(o => {
+          let items = [];
+          try { items = JSON.parse(o.items_json || '[]'); } catch(e){}
+
+          const statusColor = o.status === 'APPROVED' ? '#2ECC71' : (o.status === 'CANCELLED' ? '#E74C3C' : 'var(--accent-gold)');
+          const statusText = o.status === 'APPROVED' ? '✅ TASDIQLANDI' : (o.status === 'CANCELLED' ? '❌ BEKOR QILINDI' : '⏳ KUTILMOQDA');
+
+          return `
+            <div class="admin-card" style="border-left: 4px solid ${statusColor}; margin-bottom:16px; background:rgba(255,255,255,0.05); padding:16px; border-radius:16px; border:1px solid var(--glass-border);">
+              
+              <!-- Order Header -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="font-weight:800; font-size:15px; color:var(--text-main);">Buyurtma #${o.id}</span>
+                <span class="order-badge ${o.status}" style="font-size:11px; font-weight:700; padding:4px 10px; border-radius:8px; background:rgba(255,255,255,0.08); border:1px solid ${statusColor}; color:${statusColor};">
+                  ${statusText}
+                </span>
+              </div>
+
+              <!-- Store Info -->
+              <div style="font-size:13px; color:var(--text-muted); margin-bottom:6px;">
+                🏪 <strong>Do'kon:</strong> ${escapeHtml(o.store_name || 'BeautyGo Boutique')}
+              </div>
+
+              ${o.customer_note ? `
+                <div style="font-size:12px; color:var(--accent-gold); margin-bottom:10px; font-weight:600; background:rgba(255,215,0,0.1); padding:6px 10px; border-radius:8px; border:1px solid rgba(255,215,0,0.2);">
+                  💬 <strong>Izohingiz:</strong> "${escapeHtml(o.customer_note)}"
+                </div>
+              ` : ''}
+
+              <!-- Items Breakdown — ALWAYS VISIBLE -->
+              <div style="margin-top:12px; padding:10px; background:rgba(0,0,0,0.2); border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
+                <div style="font-size:11px; font-weight:700; color:var(--primary-pink); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">
+                  📋 Mahsulotlar Ro'yxati (${items.length} ta):
+                </div>
+                
+                ${items.length > 0 ? items.map(item => `
+                  <div style="display:flex; gap:12px; align-items:center; background:rgba(255,255,255,0.04); padding:8px 10px; border-radius:10px; margin-bottom:6px; border:1px solid rgba(255,255,255,0.06);">
+                    <img src="${item.image_url || 'images/logo.jpg'}" style="width:44px; height:44px; object-fit:cover; border-radius:8px; border:1px solid rgba(255,255,255,0.15);">
+                    <div style="flex-grow:1;">
+                      <div style="font-size:13px; font-weight:600; color:var(--text-main);">${escapeHtml(item.title_uz || item.title_ru || 'Mahsulot')}</div>
+                      ${item.size ? `<div style="font-size:11px; color:var(--primary-pink); font-weight:600;">📏 ${escapeHtml(item.size)}</div>` : ''}
+                      <div style="font-size:11px; color:var(--accent-gold); font-weight:600;">${item.quantity || 1} dona × ${(item.price || 0).toLocaleString()} so'm</div>
+                    </div>
+                    <div style="font-size:13px; font-weight:800; color:var(--text-main);">${((item.quantity || 1) * (item.price || 0)).toLocaleString()} so'm</div>
+                  </div>
+                `).join('') : '<div style="font-size:12px; color:var(--text-muted); text-align:center; padding:10px;">Mahsulot ma\'lumoti mavjud emas</div>'}
+              </div>
+
+              <!-- Order Summary Footer -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
+                <span style="font-size:15px; font-weight:800; color:var(--primary-pink);">💰 Jami: ${(o.total_price || 0).toLocaleString()} so'm</span>
+                <span style="font-size:11px; color:var(--text-dim);">📦 ${new Date(o.created_at || Date.now()).toLocaleDateString('uz-UZ', {day:'2-digit', month:'2-digit', year:'numeric'})}</span>
+              </div>
+
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error('Fetch orders error:', err);
+        container.innerHTML = `<div style="text-align:center; padding:40px; color:#E74C3C;">Buyurtmalarni yuklashda xatolik yuz berdi: ${err.message}</div>`;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
