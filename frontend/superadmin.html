@@ -79,6 +79,14 @@
           <textarea class="form-textarea" id="broadcastMsgInput" rows="3" placeholder="Masalan: 🌸 <b>Aksiya!</b> Bugun barcha kosmetikaga 20% chegirma!" style="-webkit-user-select:text; user-select:text;"></textarea>
         </div>
 
+        <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:10px; margin-bottom:10px; border:1px dashed var(--glass-border);">
+          <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>📁 Qurilmadan Rasm / Video Yuklash (Telefon yoki Kompyuterdan)</span>
+            <span id="broadcastFileStatus" style="font-size:11px; color:var(--primary-pink); font-weight:700;"></span>
+          </label>
+          <input type="file" class="form-input" id="broadcastFileInput" accept="image/*,video/*" style="padding:6px;" onchange="handleBroadcastFileSelect(this)">
+        </div>
+
         <div style="display:grid; grid-template-columns:1fr 2fr; gap:8px; margin-bottom:10px;">
           <div class="form-group" style="margin:0;">
             <label class="form-label">Media Turi</label>
@@ -89,10 +97,11 @@
             </select>
           </div>
           <div class="form-group" style="margin:0;">
-            <label class="form-label">Rasm / Video URL Havolasi</label>
+            <label class="form-label">Media URL Havolasi (yoki avto-to'ldiriladi)</label>
             <input type="text" class="form-input" id="broadcastMediaUrl" placeholder="https://example.com/banner.jpg">
           </div>
         </div>
+
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
           <div class="form-group" style="margin:0;">
@@ -173,9 +182,10 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=2.0.7"></script>
-  <script src="js/i18n.js?v=2.0.7"></script>
-  <script src="js/superadmin.js?v=2.0.7"></script>
+  <script src="js/config.js?v=2.0.8"></script>
+  <script src="js/i18n.js?v=2.0.8"></script>
+  <script src="js/superadmin.js?v=2.0.8"></script>
+
 
 
 
