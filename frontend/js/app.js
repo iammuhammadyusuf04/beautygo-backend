@@ -630,8 +630,9 @@ async function submitCheckout() {
       cart = [];
       updateCartBadge();
       closeModal('cartModal');
-      window.location.href = 'orders.html';
+      showTab('orders');
     }
+
 
 
   } catch (err) {
