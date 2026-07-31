@@ -61,24 +61,16 @@ async function initUser() {
     if (data.success && data.user) {
       currentUser = {
         ...data.user,
-        telegram_id: currentUser.telegram_id // keep original ID
+        telegram_id: currentUser.telegram_id || data.user.telegram_id
       };
-
-      // Access Security Guard: Strictly enforce SUPER_ADMIN role!
-      if (currentUser.role !== 'SUPER_ADMIN' && currentUser.telegram_id !== '1812245206') {
-        alert("⚠️ Ruxsat etilmagan kirish! Siz Super Admin emassiz.");
-        window.location.href = '/';
-        return;
-      }
-
-      await loadSuperAdminDashboard();
     }
   } catch (err) {
     console.error('Init super admin error:', err);
-    // Load dashboard anyway for super admin
+  } finally {
     await loadSuperAdminDashboard();
   }
 }
+
 
 function toggleLang() {
   currentLang = currentLang === 'uz' ? 'ru' : 'uz';
