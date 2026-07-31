@@ -239,37 +239,55 @@ if (bot) {
         ? '✅ *TASDIQLANDI* (Sotuvchi buyurtmani qabul qildi)' 
         : '❌ *BEKOR QILINDI*';
 
-      // Retain full original order text and append status
-      const origText = query.message.text || '';
-      const cleanOrigText = origText.replace(/Iltimos, buyurtmani tasdiqlang yoki bekor qiling 👇.*/s, '').trim();
-      const updatedText = `${cleanOrigText}\n\n📌 *Buyurtma Holati*: ${statusBadge}`;
-
       bot.answerCallbackQuery(query.id, { 
         text: isApprove ? `🎉 Buyurtma #${orderId} tasdiqlandi!` : `❌ Buyurtma #${orderId} bekor qilindi!` 
       });
 
-      try {
-        await bot.editMessageText(updatedText, {
-          chat_id: query.message.chat.id,
-          message_id: query.message.message_id,
-          parse_mode: 'Markdown'
-        });
-      } catch (e) {
-        console.error('editMessageText error:', e.message);
+      if (order) {
+        try {
+          let items = [];
+          try { items = JSON.parse(order.items_json || '[]'); } catch(e){}
+          let itemsText = items.map(item => `- ${escapeMarkdown(item.title_uz || item.title_ru || '')} ${item.size ? '('+item.size+')' : ''} x${item.quantity || 1} (${(item.price||0).toLocaleString()} so'm)`).join('\n');
+
+          let customerMention = escapeMarkdown(order.customer_name || 'Mijoz');
+          if (order.customer_telegram_id && /^\d+$/.test(order.customer_telegram_id)) {
+            customerMention = `[${escapeMarkdown(order.customer_name || 'Mijoz')}](tg://user?id=${order.customer_telegram_id})`;
+          }
+
+          let updatedText = `🛍️ *Yangi Buyurtma #${order.id}!*\n\n` +
+            `👤 *Mijoz*: ${customerMention}\n` +
+            `📞 *Tel*: ${escapeMarkdown(order.customer_phone || '')}\n\n`;
+
+          if (order.customer_note) {
+            updatedText += `💬 *Sotuvchiga Izoh*: _"${escapeMarkdown(order.customer_note)}"_\n\n`;
+          }
+
+          updatedText += `📋 *Mahsulotlar*:\n${itemsText}\n\n` +
+            `💰 *Jami*: *${(order.total_price||0).toLocaleString()} so'm*\n\n` +
+            `📌 *Buyurtma Holati*: ${statusBadge}`;
+
+          await bot.editMessageText(updatedText, {
+            chat_id: query.message.chat.id,
+            message_id: query.message.message_id,
+            parse_mode: 'Markdown'
+          });
+        } catch (e) {
+          console.error('editMessageText error:', e.message);
+        }
       }
 
       // Send Telegram Notification directly to CUSTOMER (Mijoz)
-      if (order && order.customer_telegram_id) {
+      if (order && order.customer_telegram_id && /^\d+$/.test(order.customer_telegram_id)) {
         try {
           if (isApprove) {
             const custMsg = `🎉 *Sizning Buyurtmangiz #${order.id} Tasdiqlandi!*\n\n` +
-              `🏪 *Do'kon*: ${storeName}\n` +
-              `💰 *Jami*: ${order.total_price.toLocaleString()} so'm\n\n` +
+              `🏪 *Do'kon*: ${escapeMarkdown(storeName)}\n` +
+              `💰 *Jami*: ${(order.total_price||0).toLocaleString()} so'm\n\n` +
               `📞 Sotuvchi tez orada siz bilan bog'lanadi va buyurtmangizni etkazib beradi! Xaridingiz uchun rahmat! 🌸`;
             await bot.sendMessage(order.customer_telegram_id, custMsg, { parse_mode: 'Markdown' });
           } else {
             const custMsg = `❌ *Sizning Buyurtmangiz #${order.id} Bekor Qilindi.*\n\n` +
-              `🏪 *Do'kon*: ${storeName}\n` +
+              `🏪 *Do'kon*: ${escapeMarkdown(storeName)}\n` +
               `💬 Qo'shimcha ma'lumot uchun sotuvchi bilan bog'lanishingiz mumkin.`;
             await bot.sendMessage(order.customer_telegram_id, custMsg, { parse_mode: 'Markdown' });
           }
@@ -287,24 +305,24 @@ async function sendOrderNotificationToAdmin(order, store) {
 
   try {
     const items = JSON.parse(order.items_json);
-    let itemsText = items.map(item => `- ${item.title_uz} ${item.size ? '('+item.size+')' : ''} x${item.quantity} (${item.price.toLocaleString()} so'm)`).join('\n');
+    let itemsText = items.map(item => `- ${escapeMarkdown(item.title_uz || item.title_ru || '')} ${item.size ? '('+item.size+')' : ''} x${item.quantity || 1} (${(item.price||0).toLocaleString()} so'm)`).join('\n');
 
     // Link customer's name directly to their Telegram profile
-    let customerMention = order.customer_name;
-    if (order.customer_telegram_id) {
+    let customerMention = escapeMarkdown(order.customer_name);
+    if (order.customer_telegram_id && /^\d+$/.test(order.customer_telegram_id)) {
       customerMention = `[${escapeMarkdown(order.customer_name)}](tg://user?id=${order.customer_telegram_id})`;
     }
 
     let message = `🛍️ *Yangi Buyurtma #${order.id}!*\n\n` +
       `👤 *Mijoz*: ${customerMention}\n` +
-      `📞 *Tel*: ${order.customer_phone}\n\n`;
+      `📞 *Tel*: ${escapeMarkdown(order.customer_phone)}\n\n`;
 
     if (order.customer_note) {
       message += `💬 *Sotuvchiga Izoh*: _"${escapeMarkdown(order.customer_note)}"_\n\n`;
     }
 
     message += `📋 *Mahsulotlar*:\n${itemsText}\n\n` +
-      `💰 *Jami*: *${order.total_price.toLocaleString()} so'm*\n\n` +
+      `💰 *Jami*: *${(order.total_price||0).toLocaleString()} so'm*\n\n` +
       `Iltimos, buyurtmani tasdiqlang yoki bekor qiling 👇`;
 
     const keyboard = {
@@ -323,6 +341,7 @@ async function sendOrderNotificationToAdmin(order, store) {
     console.error('Order notification error:', err.message);
   }
 }
+
 
 
 // Store Subscription Broadcast: Sends Telegram notification with product link to subscribers
