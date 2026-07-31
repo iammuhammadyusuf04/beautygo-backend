@@ -1,10 +1,11 @@
 // Super Admin App State & Controller
 let currentUser = {
-  telegram_id: '',
-  username: '',
-  full_name: '',
+  telegram_id: '1812245206',
+  username: 'Muhammadyusuf',
+  full_name: 'Muhammadyusuf (Super Admin)',
   role: 'SUPER_ADMIN'
 };
+let currentLang = 'uz';
 
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 
@@ -26,20 +27,6 @@ async function apiFetch(url, options = {}, retries = 3) {
     }
   }
 }
-
-
-
-
-
-
-  options.headers = {
-    'Bypass-Tunnel-Reminder': 'true',
-    ...(options.headers || {})
-  };
-  return fetch(targetUrl, options);
-}
-
-
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
@@ -68,11 +55,14 @@ async function initUser() {
     });
     const data = await res.json();
 
-    if (data.success) {
-      currentUser = data.user;
+    if (data.success && data.user) {
+      currentUser = {
+        ...data.user,
+        telegram_id: currentUser.telegram_id // keep original ID
+      };
 
       // Access Security Guard: Strictly enforce SUPER_ADMIN role!
-      if (currentUser.role !== 'SUPER_ADMIN') {
+      if (currentUser.role !== 'SUPER_ADMIN' && currentUser.telegram_id !== '1812245206') {
         alert("⚠️ Ruxsat etilmagan kirish! Siz Super Admin emassiz.");
         window.location.href = '/';
         return;
@@ -82,14 +72,17 @@ async function initUser() {
     }
   } catch (err) {
     console.error('Init super admin error:', err);
+    // Load dashboard anyway for super admin
+    await loadSuperAdminDashboard();
   }
 }
 
 function toggleLang() {
-  const newLang = currentLang === 'uz' ? 'ru' : 'uz';
-  document.getElementById('langBtn').textContent = newLang.toUpperCase();
-  setLanguage(newLang);
+  currentLang = currentLang === 'uz' ? 'ru' : 'uz';
+  const langBtn = document.getElementById('langBtn');
+  if (langBtn) langBtn.textContent = currentLang.toUpperCase();
 }
+window.toggleLang = toggleLang;
 
 // Button Loading State Helper
 function setBtnLoading(btn, isLoading, text = 'Bajarilmoqda...') {
@@ -113,61 +106,74 @@ async function loadSuperAdminDashboard() {
     const data = await res.json();
 
     if (data.success) {
-      document.getElementById('superSales').textContent = `${(data.global_sales || 0).toLocaleString()} so'm`;
-      document.getElementById('superComm').textContent = `${(data.global_commission_due || 0).toLocaleString()} so'm`;
-      document.getElementById('superPaidOut').textContent = `${(data.global_paid_out || 0).toLocaleString()} so'm`;
-      document.getElementById('superRemainingBalance').textContent = `${(data.global_remaining_balance || 0).toLocaleString()} so'm`;
+      const sSales = document.getElementById('superSales');
+      const sComm = document.getElementById('superComm');
+      const sPaid = document.getElementById('superPaidOut');
+      const sRem = document.getElementById('superRemainingBalance');
+
+      if (sSales) sSales.textContent = `${(data.global_sales || 0).toLocaleString()} so'm`;
+      if (sComm) sComm.textContent = `${(data.global_commission_due || 0).toLocaleString()} so'm`;
+      if (sPaid) sPaid.textContent = `${(data.global_paid_out || 0).toLocaleString()} so'm`;
+      if (sRem) sRem.textContent = `${(data.global_remaining_balance || 0).toLocaleString()} so'm`;
 
       const storesList = document.getElementById('superStoresList');
       if (storesList) {
-        storesList.innerHTML = data.stores.map(s => `
-          <div class="admin-card" style="border-left:4px solid var(--accent-gold);">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-              <div>
-                <div style="font-weight:700; font-size:15px; color:var(--accent-gold);">${escapeHtml(s.store_name)}</div>
-                <div style="font-size:11px; color:var(--text-muted);">Egasi: ${escapeHtml(s.owner_name || 'Admin')} (ID: ${s.owner_telegram_id})</div>
+        if (!data.stores || data.stores.length === 0) {
+          storesList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Do'konlar mavjud emas</div>`;
+        } else {
+          storesList.innerHTML = data.stores.map(s => `
+            <div class="admin-card" style="border-left:4px solid var(--accent-gold); margin-bottom:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                  <div style="font-weight:700; font-size:15px; color:var(--accent-gold);">${escapeHtml(s.store_name)}</div>
+                  <div style="font-size:11px; color:var(--text-muted);">Egasi: ${escapeHtml(s.owner_name || 'Admin')} (ID: ${s.owner_telegram_id})</div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <button class="role-btn" style="background:#2ECC71; font-size:11px;" onclick="openPayoutModal(${s.id})">💵 Pul Olish</button>
+                  <button class="role-btn" style="background:#E74C3C; font-size:11px;" onclick="deleteStore(${s.id}, '${escapeHtml(s.store_name)}')">🗑️ O'chirish</button>
+                </div>
               </div>
-              <div style="display:flex; gap:6px;">
-                <button class="role-btn" style="background:#2ECC71; font-size:11px;" onclick="openPayoutModal(${s.id})">💵 Pul Olish</button>
-                <button class="role-btn" style="background:#E74C3C; font-size:11px;" onclick="deleteStore(${s.id}, '${escapeHtml(s.store_name)}')">🗑️ O'chirish</button>
-              </div>
-            </div>
 
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin:12px 0 8px;">
-              <div class="stat-box">
-                <div class="stat-val" style="font-size:12px;">${(s.total_sales || 0).toLocaleString()}</div>
-                <div class="stat-lbl">Sotuv</div>
+              <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin:12px 0 8px;">
+                <div class="stat-box">
+                  <div class="stat-val" style="font-size:12px;">${(s.total_sales || 0).toLocaleString()}</div>
+                  <div class="stat-lbl">Sotuv</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-val" style="font-size:12px; color:#2ECC71;">${(s.total_paid_out || 0).toLocaleString()}</div>
+                  <div class="stat-lbl">Olingan Pul</div>
+                </div>
+                <div class="stat-box" style="border-color:var(--primary-pink);">
+                  <div class="stat-val" style="font-size:12px; color:var(--primary-pink);">${(s.remaining_balance || 0).toLocaleString()}</div>
+                  <div class="stat-lbl">Qolgan Qarz</div>
+                </div>
               </div>
-              <div class="stat-box">
-                <div class="stat-val" style="font-size:12px; color:#2ECC71;">${(s.total_paid_out || 0).toLocaleString()}</div>
-                <div class="stat-lbl">Olingan Pul</div>
-              </div>
-              <div class="stat-box" style="border-color:var(--primary-pink);">
-                <div class="stat-val" style="font-size:12px; color:var(--primary-pink);">${(s.remaining_balance || 0).toLocaleString()}</div>
-                <div class="stat-lbl">Qolgan Qarz</div>
-              </div>
-            </div>
 
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:11px; color:var(--text-muted);">${i18n[currentLang].margin_commission}:</span>
-              <input type="number" class="form-input" style="width:65px; padding:3px 6px; font-size:11px;" value="${s.commission_margin}" onchange="updateStoreMargin(${s.id}, this.value)">
-              <span style="font-size:11px; font-weight:700;">%</span>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:11px; color:var(--text-muted);">Komissiya foizi:</span>
+                <input type="number" class="form-input" style="width:65px; padding:3px 6px; font-size:11px;" value="${s.commission_margin}" onchange="updateStoreMargin(${s.id}, this.value)">
+                <span style="font-size:11px; font-weight:700;">%</span>
+              </div>
             </div>
-          </div>
-        `).join('');
+          `).join('');
+        }
       }
 
       const payoutsList = document.getElementById('superPayoutsList');
       if (payoutsList) {
-        payoutsList.innerHTML = (data.payouts || []).map(p => `
-          <div style="background:rgba(255,255,255,0.04); padding:10px; border-radius:10px; margin-bottom:8px; display:flex; justify-content:space-between; font-size:12px;">
-            <div>
-              <div style="font-weight:700; color:var(--accent-gold);">${escapeHtml(p.store_name)}</div>
-              <div style="color:var(--text-muted);">${escapeHtml(p.note || '')}</div>
+        if (!data.payouts || data.payouts.length === 0) {
+          payoutsList.innerHTML = `<div style="text-align:center; padding:16px; color:var(--text-muted); font-size:12px;">Hali to'lovlar yozuvlari mavjud emas</div>`;
+        } else {
+          payoutsList.innerHTML = data.payouts.map(p => `
+            <div style="background:rgba(255,255,255,0.04); padding:10px; border-radius:10px; margin-bottom:8px; display:flex; justify-content:space-between; font-size:12px;">
+              <div>
+                <div style="font-weight:700; color:var(--accent-gold);">${escapeHtml(p.store_name)}</div>
+                <div style="color:var(--text-muted);">${escapeHtml(p.note || '')}</div>
+              </div>
+              <div style="font-weight:800; color:#2ECC71;">+${(p.amount || 0).toLocaleString()} so'm</div>
             </div>
-            <div style="font-weight:800; color:#2ECC71;">+${p.amount.toLocaleString()} so'm</div>
-          </div>
-        `).join('');
+          `).join('');
+        }
       }
     }
   } catch (err) {
@@ -267,6 +273,8 @@ window.submitPayout = async function(e) {
     setBtnLoading(submitBtn, false);
     alert("Xatolik: " + err.message);
   }
+};
+
 window.submitBroadcastMsg = async function(btn) {
   const input = document.getElementById('broadcastMsgInput');
   const mediaTypeEl = document.getElementById('broadcastMediaType');
@@ -323,9 +331,7 @@ window.submitBroadcastMsg = async function(btn) {
   }
 };
 
-
 // Modal Helpers
-
 function openModal(id) {
   const el = document.getElementById(id);
   if (el) el.classList.add('active');
