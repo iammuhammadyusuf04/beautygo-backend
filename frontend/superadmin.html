@@ -69,17 +69,47 @@
         </div>
       </div>
 
-      <!-- Broadcast Announcement Card -->
+      <!-- Advanced Broadcast Announcement Card -->
       <div class="admin-card" style="margin-top:16px; border-color:var(--primary-pink);">
-        <h3 style="font-size:16px; color:var(--primary-pink); margin-bottom:8px;">📢 Bot Foydalanuvchilariga Reklama / Xabar Yuborish</h3>
-        <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Botdan foydalangan va /start bosgan barcha mijozlarga e'lon tarqatish.</p>
+        <h3 style="font-size:16px; color:var(--primary-pink); margin-bottom:6px;">📢 Post & Reklama Tarqatish</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Botdan /start bosgan barcha xaridorlarga rasm, video, matn va tugmali reklama yuborish.</p>
+        
         <div class="form-group" style="margin-bottom:10px;">
-          <textarea class="form-textarea" id="broadcastMsgInput" rows="3" placeholder="Masalan: 🌸 Bugun barcha parfyumlarga 20% chegirma! Mini App-da xarid qiling..." style="-webkit-user-select:text; user-select:text;"></textarea>
+          <label class="form-label">Post Matni / Matnli E'lon (HTML format qo'llab-quvvatlanadi)</label>
+          <textarea class="form-textarea" id="broadcastMsgInput" rows="3" placeholder="Masalan: 🌸 <b>Aksiya!</b> Bugun barcha kosmetikaga 20% chegirma!" style="-webkit-user-select:text; user-select:text;"></textarea>
         </div>
-        <button class="role-btn" style="background:linear-gradient(135deg, var(--primary-pink), var(--deep-magenta)); width:100%; padding:10px; font-weight:700; font-size:13px;" onclick="submitBroadcastMsg(this)">
-          🚀 Barcha Userlarga Yuborish
+
+        <div style="display:grid; grid-template-columns:1fr 2fr; gap:8px; margin-bottom:10px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Media Turi</label>
+            <select class="form-input" id="broadcastMediaType">
+              <option value="none">🚫 Yo'q (Faqat matn)</option>
+              <option value="photo">🖼️ Rasm (Photo)</option>
+              <option value="video">🎥 Video (Video)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Rasm / Video URL Havolasi</label>
+            <input type="text" class="form-input" id="broadcastMediaUrl" placeholder="https://example.com/banner.jpg">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Tugma Matni (Ixtiyoriy)</label>
+            <input type="text" class="form-input" id="broadcastBtnText" placeholder="🌸 Hozir Xarid Qilish">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Tugma Linki (URL)</label>
+            <input type="text" class="form-input" id="broadcastBtnUrl" placeholder="https://t.me/BeautyGoappbot">
+          </div>
+        </div>
+
+        <button class="role-btn" style="background:linear-gradient(135deg, var(--primary-pink), var(--deep-magenta)); width:100%; padding:12px; font-weight:700; font-size:13px;" onclick="submitBroadcastMsg(this)">
+          🚀 Barcha Userlarga Post Yuborish
         </button>
       </div>
+
 
       <h3 style="font-size:15px; margin:20px 0 10px;">🛍️ Do'konlar Balansi va Komissiyalar</h3>
       <div id="superStoresList">
