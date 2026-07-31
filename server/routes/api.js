@@ -43,6 +43,62 @@ router.post('/init-user', async (req, res) => {
       user.telegram_id = tid;
     }
 
+    // Super Admin Broadcast (Send message/ad to all bot users)
+    router.post('/super-admin/broadcast', async (req, res) => {
+      try {
+        const { admin_telegram_id, message, image_url } = req.body;
+        
+        const tid = String(admin_telegram_id || '');
+        const user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [tid]);
+        const isSuperAdmin = tid === '1812245206' || (user && user.role === 'SUPER_ADMIN');
+
+        if (!isSuperAdmin) {
+          return res.status(403).json({ error: "Ruxsat etilmagan! Faqat Super Admin xabar yubora oladi." });
+        }
+
+        if (!message || !message.trim()) {
+          return res.status(400).json({ error: "Xabar matni bo'sh bo'lmasligi kerak!" });
+        }
+
+        const allUsers = await dbAsync.all(
+          `SELECT DISTINCT telegram_id FROM users WHERE telegram_id IS NOT NULL AND telegram_id NOT LIKE 'guest_%'`
+        );
+
+        if (!allUsers || allUsers.length === 0) {
+          return res.json({ success: true, count: 0, sent: 0, failed: 0, message: "Bazada bot foydalanuvchilari topilmadi." });
+        }
+
+        const { bot } = require('../bot');
+        let sent = 0;
+        let failed = 0;
+
+        for (const u of allUsers) {
+          try {
+            if (bot) {
+              if (image_url && image_url.startsWith('http')) {
+                await bot.sendPhoto(u.telegram_id, image_url, { caption: message });
+              } else {
+                await bot.sendMessage(u.telegram_id, message);
+              }
+              sent++;
+            }
+          } catch (err) {
+            failed++;
+          }
+        }
+
+        res.json({
+          success: true,
+          total_users: allUsers.length,
+          sent,
+          failed,
+          message: `📢 Xabar ${sent} ta foydalanuvchiga muvaffaqiyatli yuborildi!`
+        });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
     // Super admin check
     const isSuperAdmin = (cleanUsername && cleanUsername.toLowerCase() === 'muhammadyusuf')
       || tid === '1812245206'
