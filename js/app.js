@@ -84,14 +84,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initUser() {
   try {
+    // Save the original telegram_id that was set from Telegram/session
+    const originalTelegramId = currentUser.telegram_id;
     const res = await apiFetch('/api/init-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(currentUser)
     });
     const data = await res.json();
-    if (data.success) {
-      currentUser = data.user;
+    if (data.success && data.user) {
+      // Keep the original telegram_id - never overwrite with DB version
+      const role = data.user.role || 'USER';
+      currentUser = {
+        ...data.user,
+        telegram_id: originalTelegramId, // Always keep the session/Telegram ID
+        role
+      };
     }
   } catch (err) {
     console.error('Init user error:', err);
