@@ -269,14 +269,23 @@ window.submitPayout = async function(e) {
   }
 window.submitBroadcastMsg = async function(btn) {
   const input = document.getElementById('broadcastMsgInput');
+  const mediaTypeEl = document.getElementById('broadcastMediaType');
+  const mediaUrlEl = document.getElementById('broadcastMediaUrl');
+  const btnTextEl = document.getElementById('broadcastBtnText');
+  const btnUrlEl = document.getElementById('broadcastBtnUrl');
+
   const message = input ? input.value.trim() : '';
+  const media_type = mediaTypeEl ? mediaTypeEl.value : 'none';
+  const media_url = mediaUrlEl ? mediaUrlEl.value.trim() : '';
+  const button_text = btnTextEl ? btnTextEl.value.trim() : '';
+  const button_url = btnUrlEl ? btnUrlEl.value.trim() : '';
 
   if (!message) {
-    alert("Iltimos, xabar matnini kiriting!");
+    alert("Iltimos, post yoki e'lon matnini kiriting!");
     return;
   }
 
-  if (!confirm("Barcha bot foydalanuvchilariga ushbu xabarni tarqatmoqchimisiz?")) {
+  if (!confirm("Barcha bot foydalanuvchilariga ushbu post va reklamani tarqatmoqchimisiz?")) {
     return;
   }
 
@@ -288,7 +297,11 @@ window.submitBroadcastMsg = async function(btn) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         admin_telegram_id: currentUser.telegram_id || '1812245206',
-        message
+        message,
+        media_type,
+        media_url,
+        button_text,
+        button_url
       })
     });
 
@@ -298,6 +311,9 @@ window.submitBroadcastMsg = async function(btn) {
     if (data.success) {
       alert(data.message);
       if (input) input.value = '';
+      if (mediaUrlEl) mediaUrlEl.value = '';
+      if (btnTextEl) btnTextEl.value = '';
+      if (btnUrlEl) btnUrlEl.value = '';
     } else {
       alert("Xatolik: " + (data.error || 'Noma\'lum xatolik'));
     }
@@ -306,6 +322,7 @@ window.submitBroadcastMsg = async function(btn) {
     alert("Xatolik: " + err.message);
   }
 };
+
 
 // Modal Helpers
 
