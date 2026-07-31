@@ -105,16 +105,17 @@
       <i class="fa-solid fa-store"></i>
       <span>Katalog</span>
     </div>
-    <a href="orders.html" class="nav-item" id="navOrders" style="text-decoration:none; color:inherit;">
+    <div class="nav-item" id="navOrders" onclick="showTab('orders')">
       <i class="fa-solid fa-bag-shopping"></i>
       <span>Buyurtmalar</span>
-    </a>
+    </div>
     <div class="nav-item" id="navCart" onclick="openCartModal()">
       <i class="fa-solid fa-cart-shopping"></i>
       <span>Savatcha</span>
       <span class="nav-badge" id="cartCountBadge" style="display:none;">0</span>
     </div>
   </nav>
+
 
   <!-- Modal: Product Details -->
   <div class="modal-overlay" id="productDetailModal">
