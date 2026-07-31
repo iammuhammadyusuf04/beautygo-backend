@@ -437,18 +437,26 @@ router.post('/orders', async (req, res) => {
   }
 });
 
-// 8. Order Queries
+// 8. Order Queries — each user only sees their own orders
 router.get('/orders/user/:telegram_id', async (req, res) => {
   try {
+    const tid = String(req.params.telegram_id);
     const orders = await dbAsync.all(
-      `SELECT o.*, s.store_name FROM orders o JOIN stores s ON o.store_id = s.id WHERE o.customer_telegram_id = ? ORDER BY o.id DESC`,
-      [String(req.params.telegram_id)]
+      `SELECT o.id, o.customer_telegram_id, o.customer_name, o.customer_phone,
+              o.customer_note, o.store_id, o.items_json, o.total_price, o.status, o.created_at,
+              COALESCE(s.store_name, 'BeautyGo Boutique') as store_name
+       FROM orders o
+       LEFT JOIN stores s ON o.store_id = s.id
+       WHERE o.customer_telegram_id = ?
+       ORDER BY o.id DESC`,
+      [tid]
     );
     res.json({ success: true, orders });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 router.get('/orders/store/:store_id', async (req, res) => {
   try {
