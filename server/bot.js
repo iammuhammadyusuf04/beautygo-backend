@@ -45,13 +45,11 @@ async function getRoleKeyboard(telegramId) {
   const isSuperAdmin = String(telegramId) === '1812245206' || (user && user.role === 'SUPER_ADMIN');
   const isAdmin = (user && user.role === 'ADMIN' && ownedStore) || isSuperAdmin;
 
-  // Customer gets main marketplace & dedicated orders page
+  // Customer gets main marketplace URL
   let keyboard = [
-    [
-      { text: "🌸 BeautyGo Marketpleys", web_app: { url: getValidWebAppUrl('/') } },
-      { text: "📦 Buyurtmalarim", web_app: { url: getValidWebAppUrl('/orders.html') } }
-    ]
+    [{ text: "🌸 BeautyGo Marketpleys", web_app: { url: getValidWebAppUrl('/') } }]
   ];
+
 
 
   // Store Owners get dedicated /admin URL ONLY if they own a store or are SuperAdmin
@@ -98,7 +96,38 @@ if (bot) {
     }
   });
 
+  // Super Admin Broadcast Command: /reklama <matn> or /broadcast <matn>
+  bot.onText(/\/(?:broadcast|reklama)(?:\s+([\s\S]+))?/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const telegramId = String(msg.from.id);
+    const textToSend = match[1] ? match[1].trim() : '';
+
+    if (telegramId !== '1812245206') {
+      return bot.sendMessage(chatId, "⛔ *Ruxsat berilmagan!* Faqat Super Admin reklama tarqata oladi.", { parse_mode: 'Markdown' });
+    }
+
+    if (!textToSend) {
+      return bot.sendMessage(chatId, "💡 *Reklama tarqatish ko'rsatmasi*:\n\n`/reklama Salom barchaga! Yangi tovarlarimiz keldi!`\n\nyoki Super Admin veb portalidan ham yuborishingiz mumkin.", { parse_mode: 'Markdown' });
+    }
+
+    const allUsers = await dbAsync.all(`SELECT DISTINCT telegram_id FROM users WHERE telegram_id IS NOT NULL AND telegram_id NOT LIKE 'guest_%'`);
+    let sent = 0;
+    let failed = 0;
+
+    for (const u of allUsers) {
+      try {
+        await bot.sendMessage(u.telegram_id, textToSend);
+        sent++;
+      } catch (err) {
+        failed++;
+      }
+    }
+
+    bot.sendMessage(chatId, `📢 *Reklama xabari tarqatildi!*\n\n✅ Muvaffaqiyatli: ${sent} ta userga yuborildi\n❌ Yetib bormadi: ${failed} ta user`, { parse_mode: 'Markdown' });
+  });
+
   bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
+
     try {
       const chatId = msg.chat.id;
       const telegramId = String(msg.from.id);
