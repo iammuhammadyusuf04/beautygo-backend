@@ -1,6 +1,6 @@
 // Customer Marketplace App State
 let currentUser = {
-  telegram_id: '7823163493',
+  telegram_id: '',  // Will be set from Telegram WebApp or a session ID
   username: '',
   full_name: '',
   role: 'USER'
@@ -17,18 +17,23 @@ let isSubscribedToCurrentStore = false;
 
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 
-// Universal Fetch Wrapper - Supports Cloudflare Tunnel & Netlify
-async function apiFetch(url, options = {}) {
+// Universal Fetch Wrapper with Production API prefix and Auto-Retry
+async function apiFetch(url, options = {}, retries = 3) {
   let targetUrl = url;
   if (!url.startsWith('http')) {
     const baseUrl = (window.API_BASE_URL || localStorage.getItem('BG_BACKEND_URL') || 'https://beautygo-backend-p5q9.onrender.com').replace(/\/+$/, '');
     targetUrl = baseUrl ? `${baseUrl}${url}` : url;
   }
-  options.headers = {
-    'Bypass-Tunnel-Reminder': 'true',
-    ...(options.headers || {})
-  };
-  return fetch(targetUrl, options);
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(targetUrl, options);
+      return res;
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
 }
 
 
@@ -37,14 +42,24 @@ async function apiFetch(url, options = {}) {
 
 
 
+
 document.addEventListener('DOMContentLoaded', async () => {
-  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
     tg.ready();
     tg.expand();
     const u = tg.initDataUnsafe.user;
     currentUser.telegram_id = String(u.id);
     currentUser.username = u.username || '';
     currentUser.full_name = `${u.first_name || ''} ${u.last_name || ''}`.trim();
+  } else {
+    // Outside Telegram: assign a unique per-tab session ID (sessionStorage)
+    let sessionId = sessionStorage.getItem('bg_session_id');
+    if (!sessionId) {
+      sessionId = 'guest_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+      sessionStorage.setItem('bg_session_id', sessionId);
+    }
+    currentUser.telegram_id = sessionId;
+    currentUser.full_name = 'Mehmon';
   }
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -69,14 +84,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initUser() {
   try {
+    // Save the original telegram_id that was set from Telegram/session
+    const originalTelegramId = currentUser.telegram_id;
     const res = await apiFetch('/api/init-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(currentUser)
     });
     const data = await res.json();
-    if (data.success) {
-      currentUser = data.user;
+    if (data.success && data.user) {
+      // Keep the original telegram_id - never overwrite with DB version
+      const role = data.user.role || 'USER';
+      currentUser = {
+        ...data.user,
+        telegram_id: originalTelegramId, // Always keep the session/Telegram ID
+        role
+      };
     }
   } catch (err) {
     console.error('Init user error:', err);
@@ -607,8 +630,9 @@ async function submitCheckout() {
       cart = [];
       updateCartBadge();
       closeModal('cartModal');
-      showTab('orders');
+      window.location.href = 'orders.html';
     }
+
 
   } catch (err) {
     setBtnLoading(submitBtn, false);
@@ -616,10 +640,15 @@ async function submitCheckout() {
   }
 }
 
-// Load User Orders History
+// Load User Orders History — only shows orders for the current user
 async function loadUserOrders() {
   try {
-    const res = await apiFetch(`/api/orders/user/${currentUser.telegram_id}`);
+    if (!currentUser.telegram_id) {
+      document.getElementById('userOrdersList').innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">Buyurtmalarni ko'rish uchun Telegram orqali kiring</div>`;
+      return;
+    }
+
+    const res = await apiFetch(`/api/orders/user/${encodeURIComponent(currentUser.telegram_id)}`);
     const data = await res.json();
     const list = document.getElementById('userOrdersList');
 
@@ -633,34 +662,34 @@ async function loadUserOrders() {
       try { items = JSON.parse(o.items_json || '[]'); } catch(e){}
 
       return `
-        <div class="admin-card" style="border-left: 4px solid ${o.status === 'APPROVED' ? '#2ECC71' : (o.status === 'CANCELLED' ? '#E74C3C' : 'var(--accent-gold)')}; cursor:pointer;" onclick="toggleCustomerOrderExpand('cust_order_${o.id}')">
+        <div class="admin-card" style="border-left: 4px solid ${o.status === 'APPROVED' ? '#2ECC71' : (o.status === 'CANCELLED' ? '#E74C3C' : 'var(--accent-gold)')}; margin-bottom:14px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-weight:700; font-size:14px; color:var(--text-light);">Buyurtma #${o.id}</span>
             <span class="order-badge ${o.status}">${o.status === 'APPROVED' ? '✅ TASDIQLANDI' : (o.status === 'CANCELLED' ? '❌ BEKOR QILINDI' : '⏳ KUTILMOQDA')}</span>
           </div>
 
-          <div style="font-size:12px; color:var(--text-muted);">🏪 Do'kon: ${escapeHtml(o.store_name)}</div>
-          ${o.customer_note ? `<div style="font-size:11px; color:var(--accent-gold); margin-top:4px; font-weight:600;">💬 Izohingiz: "${escapeHtml(o.customer_note)}"</div>` : ''}
+          <div style="font-size:12px; color:var(--text-muted);">🏪 Do'kon: ${escapeHtml(o.store_name || 'BeautyGo')}</div>
+          ${o.customer_note ? `<div style="font-size:11px; color:var(--accent-gold); margin-top:4px; font-weight:600; background:rgba(255,215,0,0.1); padding:4px 8px; border-radius:6px;">💬 Izohingiz: "${escapeHtml(o.customer_note)}"</div>` : ''}
 
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-            <span style="font-size:14px; font-weight:800; color:var(--primary-pink);">${o.total_price.toLocaleString()} so'm</span>
-            <span style="font-size:11px; color:var(--text-muted); text-decoration:underline;">Tarkibini ko'rish 👇</span>
+          <!-- Order Items Breakdown — ALWAYS VISIBLE -->
+          <div style="margin-top:10px; padding:10px; background:rgba(255,255,255,0.03); border-radius:10px;">
+            <div style="font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">📋 Mahsulotlar Ro'yxati (${items.length} ta):</div>
+            ${items.length > 0 ? items.map(item => `
+              <div style="display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.04); padding:6px 10px; border-radius:8px; margin-bottom:4px;">
+                <img src="${item.image_url || 'images/logo.jpg'}" style="width:38px; height:38px; object-fit:cover; border-radius:6px; border:1px solid rgba(255,255,255,0.1);">
+                <div style="flex-grow:1;">
+                  <div style="font-size:12px; font-weight:600; color:var(--text-light);">${escapeHtml(item.title_uz || item.title_ru || 'Mahsulot')}</div>
+                  ${item.size ? `<div style="font-size:10px; color:var(--primary-pink);">📏 ${escapeHtml(item.size)}</div>` : ''}
+                  <div style="font-size:11px; color:var(--accent-gold);">${item.quantity || 1} dona × ${(item.price || 0).toLocaleString()} so'm</div>
+                </div>
+                <div style="font-size:12px; font-weight:700; color:var(--primary-pink);">${((item.quantity || 1) * (item.price || 0)).toLocaleString()} so'm</div>
+              </div>
+            `).join('') : '<div style="font-size:11px; color:var(--text-muted); text-align:center;">Mahsulot ma\'lumoti yo\'q</div>'}
           </div>
 
-          <!-- Expandable Order Items Breakdown -->
-          <div id="cust_order_${o.id}" style="display:none; margin-top:12px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.15);" onclick="event.stopPropagation();">
-            <div style="font-size:12px; font-weight:700; color:var(--text-light); margin-bottom:6px;">📋 Mahsulotlar Ro'yxati (${items.length} ta):</div>
-            ${items.map(item => `
-              <div style="display:flex; gap:10px; align-items:center; background:rgba(255,255,255,0.03); padding:6px 10px; border-radius:8px; margin-bottom:6px;">
-                <img src="${item.image_url || 'images/logo.jpg'}" style="width:38px; height:38px; object-fit:cover; border-radius:6px;">
-                <div style="flex-grow:1;">
-                  <div style="font-size:12px; font-weight:600;">${escapeHtml(item.title_uz)}</div>
-                  ${item.size ? `<div style="font-size:10px; color:var(--primary-pink);">${escapeHtml(item.size)}</div>` : ''}
-                  <div style="font-size:11px; color:var(--accent-gold);">${item.quantity} dona x ${item.price.toLocaleString()} so'm</div>
-                </div>
-                <div style="font-size:12px; font-weight:700; color:var(--text-light);">${(item.quantity * item.price).toLocaleString()} so'm</div>
-              </div>
-            `).join('')}
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);">
+            <span style="font-size:14px; font-weight:800; color:var(--primary-pink);">💰 Jami: ${(o.total_price || 0).toLocaleString()} so'm</span>
+            <span style="font-size:10px; color:var(--text-muted);">📦 ${new Date(o.created_at || Date.now()).toLocaleDateString('uz-UZ', {day:'2-digit', month:'2-digit', year:'numeric'})}</span>
           </div>
         </div>
       `;
