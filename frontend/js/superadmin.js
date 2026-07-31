@@ -170,6 +170,87 @@ async function loadSuperAdminDashboard() {
           `).join('');
         }
       }
+
+      // Render Global Sales & Orders History
+      const ordersList = document.getElementById('superGlobalOrdersList');
+      if (ordersList) {
+        if (!data.orders || data.orders.length === 0) {
+          ordersList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted); font-size:12px;">Hali sotuvlar tarixi mavjud emas</div>`;
+        } else {
+          ordersList.innerHTML = data.orders.map(o => {
+            let items = [];
+            try { items = JSON.parse(o.items_json || '[]'); } catch(e){}
+            const statusColor = o.status === 'APPROVED' ? '#2ECC71' : (o.status === 'CANCELLED' ? '#E74C3C' : 'var(--accent-gold)');
+            const statusText = o.status === 'APPROVED' ? '✅ TASDIQLANDI' : (o.status === 'CANCELLED' ? '❌ BEKOR QILINDI' : '⏳ KUTILMOQDA');
+            const tgLink = o.customer_telegram_id && /^\d+$/.test(o.customer_telegram_id) ? `tg://user?id=${o.customer_telegram_id}` : null;
+
+            return `
+              <div class="admin-card" style="border-left:4px solid ${statusColor}; margin-bottom:12px; background:rgba(255,255,255,0.04);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <span style="font-weight:700; font-size:14px; color:var(--text-light);">
+                    #${o.id} | ${tgLink ? `<a href="${tgLink}" target="_blank" style="color:var(--primary-pink); text-decoration:underline;">${escapeHtml(o.customer_name)}</a>` : escapeHtml(o.customer_name)}
+                  </span>
+                  <span class="order-badge" style="font-size:11px; font-weight:700; color:${statusColor}; border:1px solid ${statusColor}; padding:2px 6px; border-radius:6px;">${statusText}</span>
+                </div>
+
+                <div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">
+                  🏪 <strong>Do'kon:</strong> ${escapeHtml(o.store_name || 'BeautyGo')} | 📞 <strong>Tel:</strong> ${escapeHtml(o.customer_phone || '')}
+                </div>
+
+                ${o.customer_note ? `<div style="font-size:11px; color:var(--accent-gold); margin-bottom:6px; font-weight:600; background:rgba(255,215,0,0.1); padding:4px 8px; border-radius:6px;">💬 Izoh: "${escapeHtml(o.customer_note)}"</div>` : ''}
+
+                <!-- Items list -->
+                <div style="background:rgba(0,0,0,0.2); border-radius:8px; padding:6px 10px; margin-top:6px;">
+                  <div style="font-size:10px; font-weight:700; color:var(--primary-pink); text-transform:uppercase; margin-bottom:4px;">📋 Tovarlar (${items.length} ta):</div>
+                  ${items.map(it => `
+                    <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:2px; color:var(--text-muted);">
+                      <span>- ${escapeHtml(it.title_uz || it.title_ru || '')} ${it.size ? '('+it.size+')' : ''} x${it.quantity || 1}</span>
+                      <span style="color:var(--text-light); font-weight:600;">${((it.quantity||1)*(it.price||0)).toLocaleString()} so'm</span>
+                    </div>
+                  `).join('')}
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:12px; font-weight:700;">
+                  <span style="color:var(--accent-gold);">💰 Jami: ${(o.total_price || 0).toLocaleString()} so'm</span>
+                  <span style="color:var(--text-muted); font-size:10px;">📅 ${new Date(o.created_at || Date.now()).toLocaleDateString('uz-UZ')}</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      // Render Registered Bot Users List
+      const usersList = document.getElementById('superUsersList');
+      if (usersList) {
+        if (!data.users || data.users.length === 0) {
+          usersList.innerHTML = `<div style="text-align:center; padding:16px; color:var(--text-muted); font-size:12px;">Hali foydalanuvchilar topilmadi</div>`;
+        } else {
+          usersList.innerHTML = data.users.map(u => {
+            const isNumericId = u.telegram_id && /^\d+$/.test(u.telegram_id);
+            const tgProfileLink = isNumericId ? `tg://user?id=${u.telegram_id}` : null;
+            const roleBadgeColor = u.role === 'SUPER_ADMIN' ? 'var(--accent-gold)' : (u.role === 'ADMIN' ? '#2ECC71' : 'var(--primary-pink)');
+
+            return `
+              <div style="background:rgba(255,255,255,0.04); padding:10px 12px; border-radius:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                <div>
+                  <div style="font-weight:700; color:var(--text-light);">
+                    👤 ${tgProfileLink ? `<a href="${tgProfileLink}" target="_blank" style="color:var(--text-light); text-decoration:underline;">${escapeHtml(u.full_name || 'Foydalanuvchi')}</a>` : escapeHtml(u.full_name || 'Foydalanuvchi')}
+                    ${u.username ? `<span style="font-size:11px; color:var(--text-muted); margin-left:6px;">(@${escapeHtml(u.username)})</span>` : ''}
+                  </div>
+                  <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">ID: ${escapeHtml(u.telegram_id)} | Qatnashdi: ${new Date(u.created_at || Date.now()).toLocaleDateString('uz-UZ')}</div>
+                </div>
+
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:10px; font-weight:700; color:${roleBadgeColor}; border:1px solid ${roleBadgeColor}; padding:2px 6px; border-radius:6px;">${u.role || 'USER'}</span>
+                  ${tgProfileLink ? `<a href="${tgProfileLink}" target="_blank" class="role-btn" style="background:#0088cc; font-size:10px; padding:4px 8px; text-decoration:none;">💬 Chat</a>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
     }
   } catch (err) {
     console.error('Super admin dashboard error:', err);
