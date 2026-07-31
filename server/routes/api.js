@@ -693,6 +693,14 @@ router.get('/super-admin/dashboard', async (req, res) => {
       SELECT p.*, s.store_name FROM payouts p JOIN stores s ON p.store_id = s.id ORDER BY p.id DESC
     `);
 
+    const allOrders = await dbAsync.all(`
+      SELECT o.*, s.store_name FROM orders o LEFT JOIN stores s ON o.store_id = s.id ORDER BY o.id DESC
+    `);
+
+    const allUsers = await dbAsync.all(`
+      SELECT * FROM users WHERE telegram_id IS NOT NULL AND telegram_id NOT LIKE 'guest_%' ORDER BY created_at DESC
+    `);
+
     res.json({
       success: true,
       global_sales: globalSales,
@@ -700,12 +708,15 @@ router.get('/super-admin/dashboard', async (req, res) => {
       global_paid_out: globalPaidOut,
       global_remaining_balance: globalCommissionDue - globalPaidOut,
       stores: storesDetailed,
-      payouts: payoutsHistory
+      payouts: payoutsHistory,
+      orders: allOrders,
+      users: allUsers
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 router.post('/super-admin/stores', async (req, res) => {
   try {
