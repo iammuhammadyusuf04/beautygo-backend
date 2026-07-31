@@ -267,9 +267,48 @@ window.submitPayout = async function(e) {
     setBtnLoading(submitBtn, false);
     alert("Xatolik: " + err.message);
   }
+window.submitBroadcastMsg = async function(btn) {
+  const input = document.getElementById('broadcastMsgInput');
+  const message = input ? input.value.trim() : '';
+
+  if (!message) {
+    alert("Iltimos, xabar matnini kiriting!");
+    return;
+  }
+
+  if (!confirm("Barcha bot foydalanuvchilariga ushbu xabarni tarqatmoqchimisiz?")) {
+    return;
+  }
+
+  setBtnLoading(btn, true, 'Yuborilmoqda...');
+
+  try {
+    const res = await apiFetch('/api/super-admin/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        admin_telegram_id: currentUser.telegram_id || '1812245206',
+        message
+      })
+    });
+
+    const data = await res.json();
+    setBtnLoading(btn, false);
+
+    if (data.success) {
+      alert(data.message);
+      if (input) input.value = '';
+    } else {
+      alert("Xatolik: " + (data.error || 'Noma\'lum xatolik'));
+    }
+  } catch (err) {
+    setBtnLoading(btn, false);
+    alert("Xatolik: " + err.message);
+  }
 };
 
 // Modal Helpers
+
 function openModal(id) {
   const el = document.getElementById(id);
   if (el) el.classList.add('active');
