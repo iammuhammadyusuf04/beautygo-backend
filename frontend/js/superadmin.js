@@ -20,6 +20,16 @@ async function apiFetch(url, options = {}, retries = 3) {
     targetUrl = baseUrl ? `${baseUrl}${url}` : url;
   }
 
+  // Identity: verified Telegram initData (production) + telegram_id fallback (local/browser testing)
+  if (currentUser && currentUser.telegram_id && !targetUrl.includes('telegram_id=')) {
+    const sep = targetUrl.includes('?') ? '&' : '?';
+    targetUrl += `${sep}telegram_id=${encodeURIComponent(currentUser.telegram_id)}`;
+  }
+  options.headers = {
+    ...(options.headers || {}),
+    ...(tg && tg.initData ? { 'X-Telegram-Init-Data': tg.initData } : {})
+  };
+
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const res = await fetch(targetUrl, options);
@@ -50,6 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function initUser() {
+  let authorized = false;
   try {
     const res = await apiFetch('/api/init-user', {
       method: 'POST',
@@ -63,10 +74,23 @@ async function initUser() {
         ...data.user,
         telegram_id: currentUser.telegram_id || data.user.telegram_id
       };
+
+      // Access Security Guard: Strictly enforce SUPER_ADMIN role!
+      if (currentUser.role !== 'SUPER_ADMIN') {
+        alert("⚠️ Ruxsat etilmagan kirish! Siz Super Admin emassiz.");
+        window.location.href = '/';
+      } else {
+        authorized = true;
+      }
+    } else {
+      alert("⚠️ Autentifikatsiya muvaffaqiyatsiz tugadi.");
+      window.location.href = '/';
     }
   } catch (err) {
     console.error('Init super admin error:', err);
-  } finally {
+  }
+
+  if (authorized) {
     await loadSuperAdminDashboard();
   }
 }

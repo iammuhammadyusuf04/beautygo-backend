@@ -5,6 +5,7 @@ require('dotenv').config();
 
 const apiRoutes = require('./server/routes/api');
 const { bot } = require('./server/bot');
+const { SUPER_ADMIN_ID } = require('./server/constants');
 
 // localtunnel faqat development uchun yuklanadi
 let localtunnel = null;
@@ -15,7 +16,6 @@ if (process.env.NODE_ENV !== 'production') {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const SUPER_ADMIN_ID = '1812245206';
 
 process.on('uncaughtException', (err) => {
   console.error('⚠️ Global Uncaught Exception (handled safely):', err.message);

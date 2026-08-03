@@ -2,10 +2,65 @@ const express = require('express');
 const router = express.Router();
 const { dbAsync } = require('../database');
 const { sendOrderNotificationToAdmin, broadcastNewProductNotification, sendCustomerOrderStatusNotification } = require('../bot');
+const { verifyTelegramInitData } = require('../telegramAuth');
+const { SUPER_ADMIN_ID } = require('../constants');
 
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Identity & Authorization
+// ─────────────────────────────────────────────────────────────────────────────
+// Every request is stamped with req.authedTelegramId, derived from a
+// cryptographically verified Telegram WebApp `initData` header whenever
+// possible. Only outside production (local/browser testing without a real
+// Telegram session) do we fall back to trusting a client-supplied telegram_id.
+router.use((req, res, next) => {
+  const initData = req.headers['x-telegram-init-data'];
+  const verified = verifyTelegramInitData(initData);
+
+  if (verified) {
+    req.authedTelegramId = verified.id;
+    req.authedUsername = verified.username;
+    req.telegramVerified = true;
+  } else if (!IS_PRODUCTION) {
+    const fallback = (req.body && (req.body.telegram_id || req.body.admin_telegram_id))
+      || (req.query && req.query.telegram_id);
+    req.authedTelegramId = fallback ? String(fallback) : null;
+    req.authedUsername = (req.body && req.body.username) || '';
+    req.telegramVerified = false;
+  } else {
+    req.authedTelegramId = null;
+    req.authedUsername = null;
+    req.telegramVerified = false;
+  }
+  next();
+});
+
+async function isSuperAdmin(telegramId) {
+  if (!telegramId) return false;
+  if (String(telegramId) === SUPER_ADMIN_ID) return true;
+  const user = await dbAsync.get('SELECT role FROM users WHERE telegram_id = ?', [String(telegramId)]);
+  return !!(user && user.role === 'SUPER_ADMIN');
+}
+
+async function canAccessStore(telegramId, storeId) {
+  if (!telegramId || !storeId) return false;
+  if (await isSuperAdmin(telegramId)) return true;
+  const store = await dbAsync.get('SELECT owner_telegram_id FROM stores WHERE id = ?', [storeId]);
+  return !!(store && String(store.owner_telegram_id) === String(telegramId));
+}
+
+function requireSuperAdmin(req, res, next) {
+  isSuperAdmin(req.authedTelegramId)
+    .then(ok => {
+      if (!ok) return res.status(403).json({ error: 'Ruxsat etilmagan! Faqat Super Admin uchun.' });
+      next();
+    })
+    .catch(next);
+}
 
 // Helper to guarantee at least one active store exists
-async function getOrCreateActiveStore(ownerTelegramId = '1812245206') {
+async function getOrCreateActiveStore(ownerTelegramId = SUPER_ADMIN_ID) {
   let store = await dbAsync.get('SELECT * FROM stores ORDER BY id DESC LIMIT 1');
   if (!store) {
     const result = await dbAsync.run(
@@ -21,7 +76,17 @@ async function getOrCreateActiveStore(ownerTelegramId = '1812245206') {
 // 1. Init User & Role Check (Supports Telegram ID & Username auto-link)
 router.post('/init-user', async (req, res) => {
   try {
-    const { telegram_id, username, full_name } = req.body;
+    let { telegram_id, username, full_name } = req.body;
+
+    if (req.telegramVerified) {
+      // Verified via Telegram initData signature — this is the source of truth.
+      telegram_id = req.authedTelegramId;
+      username = req.authedUsername || username;
+    } else if (IS_PRODUCTION) {
+      // In production we never trust a bare client-claimed identity.
+      return res.status(401).json({ error: 'Telegram autentifikatsiyasi talab qilinadi.' });
+    }
+
     if (!telegram_id) {
       return res.status(400).json({ error: 'telegram_id majburiy!' });
     }
@@ -29,106 +94,30 @@ router.post('/init-user', async (req, res) => {
     const tid = String(telegram_id);
     const cleanUsername = (username || '').trim().replace(/^@/, '');
 
-    // Search user by telegram_id OR username match
-    let user = await dbAsync.get(
-      'SELECT * FROM users WHERE telegram_id = $1 OR (username IS NOT NULL AND username != $2 AND LOWER(username) = LOWER($3))',
-      [tid, '', cleanUsername]
-    );
+    // 1. Exact telegram_id match first — authoritative, avoids any merge logic below
+    let user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [tid]);
 
-    // Auto-link telegram_id if user was originally created by username
-    if (user && user.telegram_id !== tid) {
-      const oldId = user.telegram_id;
-      await dbAsync.run('UPDATE users SET telegram_id = ? WHERE telegram_id = ?', [tid, oldId]);
-      await dbAsync.run('UPDATE stores SET owner_telegram_id = ? WHERE owner_telegram_id = ?', [tid, oldId]);
-      user.telegram_id = tid;
+    // 2. Only if no row exists yet for this telegram_id, look for a username-created
+    // placeholder row (e.g. a store owner added by username before their first login)
+    // and auto-link it. Guarding on "not found by id" avoids colliding with an
+    // already-existing row at tid (which previously caused a UNIQUE constraint crash).
+    if (!user && cleanUsername) {
+      const byUsername = await dbAsync.get(
+        "SELECT * FROM users WHERE username IS NOT NULL AND username != '' AND LOWER(username) = LOWER(?) AND telegram_id != ?",
+        [cleanUsername, tid]
+      );
+      if (byUsername) {
+        const oldId = byUsername.telegram_id;
+        await dbAsync.run('UPDATE users SET telegram_id = ? WHERE telegram_id = ?', [tid, oldId]);
+        await dbAsync.run('UPDATE stores SET owner_telegram_id = ? WHERE owner_telegram_id = ?', [tid, oldId]);
+        byUsername.telegram_id = tid;
+        user = byUsername;
+      }
     }
 
-    // Super Admin Broadcast (Send message/ad with photo, video, links & buttons to all bot users)
-    router.post('/super-admin/broadcast', async (req, res) => {
-      try {
-        const { admin_telegram_id, message, media_type, media_url, button_text, button_url } = req.body;
-        
-        const tid = String(admin_telegram_id || '');
-        const user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [tid]);
-        const isSuperAdmin = tid === '1812245206' || (user && user.role === 'SUPER_ADMIN');
-
-        if (!isSuperAdmin) {
-          return res.status(403).json({ error: "Ruxsat etilmagan! Faqat Super Admin xabar yubora oladi." });
-        }
-
-        if (!message || !message.trim()) {
-          return res.status(400).json({ error: "Xabar matni bo'sh bo'lmasligi kerak!" });
-        }
-
-        const allUsers = await dbAsync.all(
-          `SELECT DISTINCT telegram_id FROM users WHERE telegram_id IS NOT NULL AND telegram_id NOT LIKE 'guest_%'`
-        );
-
-        if (!allUsers || allUsers.length === 0) {
-          return res.json({ success: true, count: 0, sent: 0, failed: 0, message: "Bazada bot foydalanuvchilari topilmadi." });
-        }
-
-        const { bot } = require('../bot');
-        if (!bot) {
-          return res.status(500).json({ error: "Telegram Bot faol emas!" });
-        }
-
-        let replyMarkup = undefined;
-        if (button_text && button_url) {
-          replyMarkup = {
-            inline_keyboard: [
-              [{ text: button_text, url: button_url }]
-            ]
-          };
-        }
-
-        const options = {
-          parse_mode: 'HTML',
-          ...(replyMarkup ? { reply_markup: replyMarkup } : {})
-        };
-
-        let sent = 0;
-        let failed = 0;
-
-        const effectiveMediaType = media_type || (media_url ? 'photo' : 'none');
-
-        for (const u of allUsers) {
-          try {
-            if (effectiveMediaType === 'photo' && media_url) {
-              await bot.sendPhoto(u.telegram_id, media_url, { caption: message, ...options });
-            } else if (effectiveMediaType === 'video' && media_url) {
-              await bot.sendVideo(u.telegram_id, media_url, { caption: message, ...options });
-            } else {
-              await bot.sendMessage(u.telegram_id, message, options);
-            }
-            sent++;
-          } catch (err) {
-            try {
-              await bot.sendMessage(u.telegram_id, message, replyMarkup ? { reply_markup: replyMarkup } : undefined);
-              sent++;
-            } catch (retryErr) {
-              failed++;
-            }
-          }
-        }
-
-        res.json({
-          success: true,
-          total_users: allUsers.length,
-          sent,
-          failed,
-          message: `📢 Reklama e'loni ${sent} ta foydalanuvchiga muvaffaqiyatli yetkazildi (${failed} ta yetmadi).`
-        });
-      } catch (err) {
-        res.status(500).json({ error: err.message });
-      }
-    });
-
-
     // Super admin check
-    const isSuperAdmin = (cleanUsername && cleanUsername.toLowerCase() === 'muhammadyusuf')
-      || tid === '1812245206'
-      || tid === '7777777';
+    const isSuperAdminUser = (cleanUsername && cleanUsername.toLowerCase() === 'muhammadyusuf')
+      || tid === SUPER_ADMIN_ID;
 
     // Check if this user owns any store
     let ownedStore = await dbAsync.get('SELECT * FROM stores WHERE owner_telegram_id = ?', [tid]);
@@ -145,7 +134,7 @@ router.post('/init-user', async (req, res) => {
 
     if (!user) {
       let role = 'USER';
-      if (isSuperAdmin) role = 'SUPER_ADMIN';
+      if (isSuperAdminUser) role = 'SUPER_ADMIN';
       else if (isStoreOwner) role = 'ADMIN';
 
       await dbAsync.run(
@@ -154,12 +143,19 @@ router.post('/init-user', async (req, res) => {
       );
       user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [tid]);
     } else {
-      if (isSuperAdmin && user.role !== 'SUPER_ADMIN') {
+      if (isSuperAdminUser && user.role !== 'SUPER_ADMIN') {
         await dbAsync.run('UPDATE users SET role = $1 WHERE telegram_id = $2', ['SUPER_ADMIN', tid]);
         user.role = 'SUPER_ADMIN';
       } else if (isStoreOwner && user.role === 'USER') {
         await dbAsync.run('UPDATE users SET role = $1 WHERE telegram_id = $2', ['ADMIN', tid]);
         user.role = 'ADMIN';
+      }
+
+      // Keep username/full_name in sync with the user's current Telegram profile
+      if ((cleanUsername && cleanUsername !== user.username) || (full_name && full_name !== user.full_name)) {
+        await dbAsync.run('UPDATE users SET username = ?, full_name = ? WHERE telegram_id = ?', [cleanUsername || user.username, full_name || user.full_name, tid]);
+        user.username = cleanUsername || user.username;
+        user.full_name = full_name || user.full_name;
       }
     }
 
@@ -258,7 +254,7 @@ router.get('/products/:id', async (req, res) => {
     if (!product) return res.status(404).json({ error: 'Mahsulot topilmadi!' });
 
     product.sizes = product.sizes ? JSON.parse(product.sizes) : [];
-    
+
     let images = [];
     if (product.images_json) {
       try { images = JSON.parse(product.images_json); } catch (e) { images = []; }
@@ -280,29 +276,28 @@ router.get('/products/:id', async (req, res) => {
   }
 });
 
-// 4. Product Add / Edit / Delete
+// 4. Product Add / Edit / Delete (store-owner-only)
 router.post('/products', async (req, res) => {
   try {
-    let { store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, images, telegram_id } = req.body;
+    let { store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, images } = req.body;
+    const requesterId = req.authedTelegramId;
 
     let targetStoreId = null;
 
-    // 1. If user telegram_id provided, check if they own a store
-    if (telegram_id) {
-      const owned = await dbAsync.get('SELECT id FROM stores WHERE owner_telegram_id = ? ORDER BY id DESC LIMIT 1', [String(telegram_id)]);
+    // 1. Requester must own a store — products always go to the caller's own store
+    if (requesterId) {
+      const owned = await dbAsync.get('SELECT id FROM stores WHERE owner_telegram_id = ? ORDER BY id DESC LIMIT 1', [String(requesterId)]);
       if (owned) targetStoreId = owned.id;
     }
 
-    // 2. If store_id was passed, check if it exists in stores table
-    if (!targetStoreId && store_id) {
+    // 2. Only a Super Admin may target an arbitrary store_id they don't own
+    if (!targetStoreId && store_id && await isSuperAdmin(requesterId)) {
       const validStore = await dbAsync.get('SELECT id FROM stores WHERE id = ?', [store_id]);
       if (validStore) targetStoreId = validStore.id;
     }
 
-    // 3. Fallback to active store
     if (!targetStoreId) {
-      const activeStore = await getOrCreateActiveStore();
-      targetStoreId = activeStore.id;
+      return res.status(403).json({ error: "Siz do'kon egasi emassiz, mahsulot qo'sha olmaysiz!" });
     }
 
     const imgList = Array.isArray(images) && images.length > 0 ? images : ['https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=450&q=80'];
@@ -310,7 +305,7 @@ router.post('/products', async (req, res) => {
     const imagesJson = JSON.stringify(imgList);
 
     const result = await dbAsync.run(
-      `INSERT INTO products (store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, image_url, images_json, is_active) 
+      `INSERT INTO products (store_id, title_uz, title_ru, description_uz, description_ru, price, category, sizes, image_url, images_json, is_active)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         targetStoreId,
@@ -332,7 +327,7 @@ router.post('/products', async (req, res) => {
 
     // Broadcast notification in background (does NOT affect response)
     try {
-      const store = await dbAsync.get('SELECT * FROM stores WHERE id = ?', [store_id]);
+      const store = await dbAsync.get('SELECT * FROM stores WHERE id = ?', [targetStoreId]);
       if (store) {
         broadcastNewProductNotification(store, { id: result.lastID, title_uz, price: parseFloat(price) || 0, image_url: coverImage });
       }
@@ -348,11 +343,17 @@ router.post('/products', async (req, res) => {
 
 router.put('/products/:id', async (req, res) => {
   try {
+    const product = await dbAsync.get('SELECT store_id FROM products WHERE id = ?', [req.params.id]);
+    if (!product) return res.status(404).json({ error: 'Mahsulot topilmadi!' });
+    if (!(await canAccessStore(req.authedTelegramId, product.store_id))) {
+      return res.status(403).json({ error: "Ruxsat etilmagan! Bu mahsulot sizga tegishli emas." });
+    }
+
     const { title_uz, title_ru, description_uz, description_ru, price, category, sizes, images } = req.body;
     const imgList = Array.isArray(images) && images.length > 0 ? images : [req.body.image_url || ''];
     const coverImage = imgList[0] || '';  // base64 or URL — store directly
     const imagesJson = JSON.stringify(imgList);
-    
+
     await dbAsync.run(
       `UPDATE products SET title_uz=?, title_ru=?, description_uz=?, description_ru=?, price=?, category=?, sizes=?, image_url=?, images_json=? WHERE id=?`,
       [
@@ -378,6 +379,12 @@ router.put('/products/:id', async (req, res) => {
 
 router.delete('/products/:id', async (req, res) => {
   try {
+    const product = await dbAsync.get('SELECT store_id FROM products WHERE id = ?', [req.params.id]);
+    if (!product) return res.status(404).json({ error: 'Mahsulot topilmadi!' });
+    if (!(await canAccessStore(req.authedTelegramId, product.store_id))) {
+      return res.status(403).json({ error: "Ruxsat etilmagan! Bu mahsulot sizga tegishli emas." });
+    }
+
     await dbAsync.run('DELETE FROM products WHERE id = ?', [req.params.id]);
     res.json({ success: true, message: "Mahsulot o'chirildi!" });
   } catch (err) {
@@ -385,10 +392,14 @@ router.delete('/products/:id', async (req, res) => {
   }
 });
 
-// 5. Store Profile Update
+// 5. Store Profile Update (store-owner-only)
 router.put('/admin/store-profile', async (req, res) => {
   try {
     const { store_id, store_name, description, logo_url } = req.body;
+    if (!(await canAccessStore(req.authedTelegramId, store_id))) {
+      return res.status(403).json({ error: "Ruxsat etilmagan! Bu do'kon sizga tegishli emas." });
+    }
+
     let finalLogo = logo_url;
     if (!finalLogo || finalLogo.trim() === '') {
       const existing = await dbAsync.get('SELECT logo_url FROM stores WHERE id = ?', [store_id]);
@@ -409,7 +420,7 @@ router.put('/admin/store-profile', async (req, res) => {
 // 6. Subscriptions Management
 router.post('/stores/:id/subscribe', async (req, res) => {
   try {
-    const { telegram_id } = req.body;
+    const telegram_id = req.authedTelegramId || req.body.telegram_id;
     const storeId = req.params.id;
 
     const existing = await dbAsync.get(
@@ -451,7 +462,9 @@ router.get('/stores/:id/subscription-status', async (req, res) => {
 // 7. Checkout & Order Creation
 router.post('/orders', async (req, res) => {
   try {
-    const { customer_telegram_id, customer_name, customer_phone, customer_note, items } = req.body;
+    const { customer_name, customer_phone, customer_note, items } = req.body;
+    // Prefer the verified/authenticated identity over a client-claimed one.
+    const customer_telegram_id = req.authedTelegramId || req.body.customer_telegram_id;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: "Savatcha bo'sh!" });
@@ -470,7 +483,7 @@ router.post('/orders', async (req, res) => {
     for (const storeId in storeOrdersMap) {
       const storeItems = storeOrdersMap[storeId];
       const store = await dbAsync.get('SELECT * FROM stores WHERE id = ?', [storeId]);
-      
+
       let storeTotal = 0;
       storeItems.forEach(i => { storeTotal += (i.price * i.quantity); });
 
@@ -523,6 +536,12 @@ router.post('/orders', async (req, res) => {
 router.get('/orders/user/:telegram_id', async (req, res) => {
   try {
     const tid = String(req.params.telegram_id);
+    const requester = req.authedTelegramId;
+    const allowed = requester && (String(requester) === tid || await isSuperAdmin(requester));
+    if (!allowed) {
+      return res.status(403).json({ error: "Ruxsat etilmagan! Faqat o'zingizning buyurtmalaringizni ko'rishingiz mumkin." });
+    }
+
     const orders = await dbAsync.all(
       `SELECT o.id, o.customer_telegram_id, o.customer_name, o.customer_phone,
               o.customer_note, o.store_id, o.items_json, o.total_price, o.status, o.created_at,
@@ -542,6 +561,10 @@ router.get('/orders/user/:telegram_id', async (req, res) => {
 
 router.get('/orders/store/:store_id', async (req, res) => {
   try {
+    if (!(await canAccessStore(req.authedTelegramId, req.params.store_id))) {
+      return res.status(403).json({ error: "Ruxsat etilmagan! Bu do'kon sizga tegishli emas." });
+    }
+
     const orders = await dbAsync.all(
       `SELECT * FROM orders WHERE store_id = ? ORDER BY id DESC`,
       [req.params.store_id]
@@ -554,18 +577,21 @@ router.get('/orders/store/:store_id', async (req, res) => {
 
 router.put('/orders/:id/status', async (req, res) => {
   try {
-    const { status } = req.body;
     const orderId = req.params.id;
+    const order = await dbAsync.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+    if (!order) return res.status(404).json({ error: 'Buyurtma topilmadi!' });
+    if (!(await canAccessStore(req.authedTelegramId, order.store_id))) {
+      return res.status(403).json({ error: "Ruxsat etilmagan! Bu buyurtma sizning do'koningizga tegishli emas." });
+    }
+
+    const { status } = req.body;
     await dbAsync.run('UPDATE orders SET status = ? WHERE id = ?', [status, orderId]);
 
     // Send Telegram Notification directly to Customer
     try {
-      const order = await dbAsync.get('SELECT * FROM orders WHERE id = ?', [orderId]);
-      if (order) {
-        const store = await dbAsync.get('SELECT store_name FROM stores WHERE id = ?', [order.store_id]);
-        const storeName = store ? store.store_name : 'BeautyGo';
-        sendCustomerOrderStatusNotification(order, status, storeName);
-      }
+      const store = await dbAsync.get('SELECT store_name FROM stores WHERE id = ?', [order.store_id]);
+      const storeName = store ? store.store_name : 'BeautyGo';
+      sendCustomerOrderStatusNotification({ ...order, status }, status, storeName);
     } catch (notifErr) {
       console.error('Failed sending customer order status notification:', notifErr.message);
     }
@@ -579,37 +605,34 @@ router.put('/orders/:id/status', async (req, res) => {
 
 router.get('/admin/store-stats/:store_id?', async (req, res) => {
   try {
-    const { telegram_id } = req.query;
-    let storeId = req.params.store_id;
-    let store = null;
-
-    if (storeId && storeId !== 'null' && storeId !== 'undefined') {
-      store = await dbAsync.get('SELECT * FROM stores WHERE id = ?', [storeId]);
+    const requester = req.authedTelegramId;
+    if (!requester) {
+      return res.status(401).json({ success: false, error: 'Autentifikatsiya talab qilinadi.' });
     }
 
-    if (!store && telegram_id) {
-      store = await dbAsync.get('SELECT * FROM stores WHERE owner_telegram_id = ? ORDER BY id DESC LIMIT 1', [String(telegram_id)]);
+    let store = null;
+    const paramStoreId = req.params.store_id;
+
+    if (paramStoreId && paramStoreId !== 'null' && paramStoreId !== 'undefined') {
+      const candidate = await dbAsync.get('SELECT * FROM stores WHERE id = ?', [paramStoreId]);
+      if (candidate && await canAccessStore(requester, candidate.id)) {
+        store = candidate;
+      }
     }
 
     if (!store) {
-      if (String(telegram_id) === '1812245206') {
-        store = await getOrCreateActiveStore();
-      } else {
-        return res.status(403).json({ success: false, error: "Siz do'kon egasi emassiz yoki sizning do'koningiz o'chirilgan!" });
-      }
+      store = await dbAsync.get('SELECT * FROM stores WHERE owner_telegram_id = ? ORDER BY id DESC LIMIT 1', [String(requester)]);
     }
 
-    if (telegram_id && String(telegram_id) !== '1812245206' && String(store.owner_telegram_id) !== String(telegram_id)) {
-      const ownStore = await dbAsync.get('SELECT * FROM stores WHERE owner_telegram_id = ? ORDER BY id DESC LIMIT 1', [String(telegram_id)]);
-      if (ownStore) {
-        store = ownStore;
-      } else {
-        return res.status(403).json({ success: false, error: "Siz do'kon egasi emassiz yoki sizning do'koningiz o'chirilgan!" });
-      }
+    if (!store && await isSuperAdmin(requester)) {
+      store = await getOrCreateActiveStore();
     }
-    
-    storeId = store.id;
 
+    if (!store) {
+      return res.status(403).json({ success: false, error: "Siz do'kon egasi emassiz yoki sizning do'koningiz o'chirilgan!" });
+    }
+
+    const storeId = store.id;
 
     const totalSalesRow = await dbAsync.get(
       `SELECT SUM(total_price) as total_sales, COUNT(*) as total_orders FROM orders WHERE store_id = ? AND status = 'APPROVED'`,
@@ -648,8 +671,8 @@ router.get('/admin/store-stats/:store_id?', async (req, res) => {
   }
 });
 
-// 10. Super Admin Dashboard & Hard Store Deletion
-router.get('/super-admin/dashboard', async (req, res) => {
+// 10. Super Admin Dashboard & Hard Store Deletion — all require SUPER_ADMIN
+router.get('/super-admin/dashboard', requireSuperAdmin, async (req, res) => {
   try {
     const storesRaw = await dbAsync.all(
       `SELECT s.*, u.full_name as owner_name FROM stores s LEFT JOIN users u ON s.owner_telegram_id = u.telegram_id`
@@ -718,7 +741,7 @@ router.get('/super-admin/dashboard', async (req, res) => {
 });
 
 
-router.post('/super-admin/stores', async (req, res) => {
+router.post('/super-admin/stores', requireSuperAdmin, async (req, res) => {
   try {
     let { owner_telegram_id, store_name, description, logo_url, commission_margin } = req.body;
 
@@ -743,7 +766,7 @@ router.post('/super-admin/stores', async (req, res) => {
     }
 
     const result = await dbAsync.run(
-      `INSERT INTO stores (owner_telegram_id, store_name, description, logo_url, commission_margin, status) 
+      `INSERT INTO stores (owner_telegram_id, store_name, description, logo_url, commission_margin, status)
        VALUES (?, ?, ?, ?, ?, 'ACTIVE')`,
       [
         cleanOwnerInput,
@@ -762,7 +785,7 @@ router.post('/super-admin/stores', async (req, res) => {
 
 
 // Hard Store Deletion (Super Admin) - Removes store, products, and subscriptions permanently & demotes admin role
-router.delete('/super-admin/stores/:id', async (req, res) => {
+router.delete('/super-admin/stores/:id', requireSuperAdmin, async (req, res) => {
   try {
     const storeId = req.params.id;
     const store = await dbAsync.get('SELECT owner_telegram_id FROM stores WHERE id = ?', [storeId]);
@@ -786,7 +809,7 @@ router.delete('/super-admin/stores/:id', async (req, res) => {
 });
 
 
-router.put('/super-admin/store-margin', async (req, res) => {
+router.put('/super-admin/store-margin', requireSuperAdmin, async (req, res) => {
   try {
     const { store_id, commission_margin } = req.body;
     await dbAsync.run('UPDATE stores SET commission_margin = ? WHERE id = ?', [parseFloat(commission_margin), store_id]);
@@ -796,7 +819,7 @@ router.put('/super-admin/store-margin', async (req, res) => {
   }
 });
 
-router.post('/super-admin/payout', async (req, res) => {
+router.post('/super-admin/payout', requireSuperAdmin, async (req, res) => {
   try {
     const { store_id, amount, note } = req.body;
     await dbAsync.run(
@@ -804,6 +827,79 @@ router.post('/super-admin/payout', async (req, res) => {
       [store_id, parseFloat(amount), note || "Super Admin tomondan qabul qilindi"]
     );
     res.json({ success: true, message: "Mablağ qabul qilingani va balans yangilandi!" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Super Admin Broadcast (Send message/ad with photo, video, links & buttons to all bot users)
+router.post('/super-admin/broadcast', requireSuperAdmin, async (req, res) => {
+  try {
+    const { message, media_type, media_url, button_text, button_url } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: "Xabar matni bo'sh bo'lmasligi kerak!" });
+    }
+
+    const allUsers = await dbAsync.all(
+      `SELECT DISTINCT telegram_id FROM users WHERE telegram_id IS NOT NULL AND telegram_id NOT LIKE 'guest_%'`
+    );
+
+    if (!allUsers || allUsers.length === 0) {
+      return res.json({ success: true, count: 0, sent: 0, failed: 0, message: "Bazada bot foydalanuvchilari topilmadi." });
+    }
+
+    const { bot } = require('../bot');
+    if (!bot) {
+      return res.status(500).json({ error: "Telegram Bot faol emas!" });
+    }
+
+    let replyMarkup = undefined;
+    if (button_text && button_url) {
+      replyMarkup = {
+        inline_keyboard: [
+          [{ text: button_text, url: button_url }]
+        ]
+      };
+    }
+
+    const options = {
+      parse_mode: 'HTML',
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {})
+    };
+
+    let sent = 0;
+    let failed = 0;
+
+    const effectiveMediaType = media_type || (media_url ? 'photo' : 'none');
+
+    for (const u of allUsers) {
+      try {
+        if (effectiveMediaType === 'photo' && media_url) {
+          await bot.sendPhoto(u.telegram_id, media_url, { caption: message, ...options });
+        } else if (effectiveMediaType === 'video' && media_url) {
+          await bot.sendVideo(u.telegram_id, media_url, { caption: message, ...options });
+        } else {
+          await bot.sendMessage(u.telegram_id, message, options);
+        }
+        sent++;
+      } catch (err) {
+        try {
+          await bot.sendMessage(u.telegram_id, message, replyMarkup ? { reply_markup: replyMarkup } : undefined);
+          sent++;
+        } catch (retryErr) {
+          failed++;
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      total_users: allUsers.length,
+      sent,
+      failed,
+      message: `📢 Reklama e'loni ${sent} ta foydalanuvchiga muvaffaqiyatli yetkazildi (${failed} ta yetmadi).`
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

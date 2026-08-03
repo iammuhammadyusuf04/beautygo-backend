@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const { SUPER_ADMIN_ID } = require('./constants');
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -232,7 +233,7 @@ async function initPg() {
     `INSERT INTO users (telegram_id, username, full_name, role, language)
      VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (telegram_id) DO UPDATE SET role = 'SUPER_ADMIN'`,
-    ['1812245206', 'Muhammadyusuf', 'Muhammadyusuf (Super Admin)', 'SUPER_ADMIN', 'uz']
+    [SUPER_ADMIN_ID, 'Muhammadyusuf', 'Muhammadyusuf (Super Admin)', 'SUPER_ADMIN', 'uz']
   );
   await pool.end();
 
@@ -312,7 +313,7 @@ function initSqlite(sqliteDb) {
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_telegram_id TEXT NOT NULL, customer_name TEXT NOT NULL, customer_phone TEXT NOT NULL, customer_note TEXT, store_id INTEGER NOT NULL, items_json TEXT NOT NULL, total_price REAL NOT NULL, commission_amount REAL DEFAULT 0, status TEXT DEFAULT 'PENDING', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS payouts (id INTEGER PRIMARY KEY AUTOINCREMENT, store_id INTEGER NOT NULL, amount REAL NOT NULL, note TEXT, status TEXT DEFAULT 'COMPLETED', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, user_telegram_id TEXT, user_name TEXT, rating INTEGER DEFAULT 5, comment TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
-  sqliteDb.run(`INSERT OR REPLACE INTO users (telegram_id, username, full_name, role, language) VALUES ('1812245206', 'Muhammadyusuf', 'Muhammadyusuf (Super Admin)', 'SUPER_ADMIN', 'uz')`);
+  sqliteDb.run(`INSERT OR REPLACE INTO users (telegram_id, username, full_name, role, language) VALUES ('${SUPER_ADMIN_ID}', 'Muhammadyusuf', 'Muhammadyusuf (Super Admin)', 'SUPER_ADMIN', 'uz')`);
   sqliteDb.get("SELECT COUNT(*) as count FROM stores", (err, row) => {
     if (err || (row && row.count > 0)) return;
     sqliteDb.run(`INSERT OR REPLACE INTO users (telegram_id, username, full_name, role, language) VALUES ('8888888', 'beauty_owner', 'Zuhra Do''kon Egasi', 'ADMIN', 'uz')`);

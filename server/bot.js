@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 const path = require('path');
 const { dbAsync } = require('./database');
+const { SUPER_ADMIN_ID } = require('./constants');
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 let bot = null;
@@ -42,7 +43,7 @@ async function getRoleKeyboard(telegramId) {
   const user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [String(telegramId)]);
   const ownedStore = await dbAsync.get('SELECT id FROM stores WHERE owner_telegram_id = ?', [String(telegramId)]);
 
-  const isSuperAdmin = String(telegramId) === '1812245206' || (user && user.role === 'SUPER_ADMIN');
+  const isSuperAdmin = String(telegramId) === SUPER_ADMIN_ID || (user && user.role === 'SUPER_ADMIN');
   const isAdmin = (user && user.role === 'ADMIN' && ownedStore) || isSuperAdmin;
 
   // Customer gets main marketplace URL
@@ -80,7 +81,7 @@ if (bot) {
 
     // Auto-detect pasted URL
     if (text.startsWith('https://') && text.includes('.loca.lt') || text.includes('.ngrok') || text.includes('.pinggy') || text.includes('.trycloudflare.com')) {
-      if (telegramId === '1812245206' || msg.from.username?.toLowerCase() === 'muhammadyusuf') {
+      if (telegramId === SUPER_ADMIN_ID || msg.from.username?.toLowerCase() === 'muhammadyusuf') {
         const newUrl = text.split(' ')[0].trim();
         process.env.WEBAPP_URL = newUrl;
 
@@ -102,7 +103,7 @@ if (bot) {
     const telegramId = String(msg.from.id);
     const textToSend = match[1] ? match[1].trim() : '';
 
-    if (telegramId !== '1812245206') {
+    if (telegramId !== SUPER_ADMIN_ID) {
       return bot.sendMessage(chatId, "⛔ *Ruxsat berilmagan!* Faqat Super Admin reklama tarqata oladi.", { parse_mode: 'Markdown' });
     }
 
@@ -139,7 +140,7 @@ if (bot) {
       let user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [telegramId]);
       
       let role = 'USER';
-      if (telegramId === '1812245206' || username.toLowerCase() === 'muhammadyusuf' || telegramId === '7777777') {
+      if (telegramId === SUPER_ADMIN_ID || username.toLowerCase() === 'muhammadyusuf') {
         role = 'SUPER_ADMIN';
       }
 

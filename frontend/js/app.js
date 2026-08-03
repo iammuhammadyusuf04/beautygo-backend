@@ -25,6 +25,16 @@ async function apiFetch(url, options = {}, retries = 3) {
     targetUrl = baseUrl ? `${baseUrl}${url}` : url;
   }
 
+  // Identity: verified Telegram initData (production) + telegram_id fallback (local/browser testing)
+  if (currentUser && currentUser.telegram_id && !targetUrl.includes('telegram_id=')) {
+    const sep = targetUrl.includes('?') ? '&' : '?';
+    targetUrl += `${sep}telegram_id=${encodeURIComponent(currentUser.telegram_id)}`;
+  }
+  options.headers = {
+    ...(options.headers || {}),
+    ...(tg && tg.initData ? { 'X-Telegram-Init-Data': tg.initData } : {})
+  };
+
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const res = await fetch(targetUrl, options);
