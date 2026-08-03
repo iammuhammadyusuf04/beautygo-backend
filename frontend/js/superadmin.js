@@ -135,6 +135,11 @@ async function loadSuperAdminDashboard() {
       if (sPaid) sPaid.textContent = `${(data.global_paid_out || 0).toLocaleString()} so'm`;
       if (sRem) sRem.textContent = `${(data.global_remaining_balance || 0).toLocaleString()} so'm`;
 
+      setCollapsibleCount('superStoresCount', (data.stores || []).length);
+      setCollapsibleCount('superGlobalOrdersCount', (data.orders || []).length);
+      setCollapsibleCount('superUsersCount', (data.users || []).length);
+      setCollapsibleCount('superPayoutsCount', (data.payouts || []).length);
+
       const storesList = document.getElementById('superStoresList');
       if (storesList) {
         if (!data.stores || data.stores.length === 0) {
@@ -531,6 +536,23 @@ window.handleBroadcastFileSelect = function(input) {
   };
   reader.readAsDataURL(file);
 };
+
+// Collapsible Section Helpers (Do'konlar/Buyurtmalar/Foydalanuvchilar/To'lovlar
+// start collapsed, showing just a count, so the panel isn't a wall of cards)
+function toggleSection(listId) {
+  const el = document.getElementById(listId);
+  const arrow = document.getElementById(listId + 'Arrow');
+  if (!el) return;
+  const isHidden = el.style.display === 'none';
+  el.style.display = isHidden ? 'block' : 'none';
+  if (arrow) arrow.textContent = isHidden ? '▼' : '▶';
+}
+window.toggleSection = toggleSection;
+
+function setCollapsibleCount(countElId, count) {
+  const el = document.getElementById(countElId);
+  if (el) el.textContent = `(${count})`;
+}
 
 // Modal Helpers
 

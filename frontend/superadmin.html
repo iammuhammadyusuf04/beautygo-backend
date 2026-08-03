@@ -20,7 +20,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <!-- Custom Glassmorphism Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css?v=2.2.0">
+  <link rel="stylesheet" href="css/styles.css?v=2.3.0">
 </head>
 <body>
 
@@ -120,23 +120,35 @@
       </div>
 
 
-      <h3 style="font-size:15px; margin:20px 0 10px;">🛍️ Do'konlar Balansi va Komissiyalar</h3>
-      <div id="superStoresList">
+      <h3 class="collapsible-header" onclick="toggleSection('superStoresList')" style="font-size:15px; margin:20px 0 10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+        <span>🛍️ Do'konlar Balansi va Komissiyalar <span id="superStoresCount" style="color:var(--text-muted); font-size:12px;">(0)</span></span>
+        <span id="superStoresListArrow">▶</span>
+      </h3>
+      <div id="superStoresList" style="display:none;">
         <!-- Stores List -->
       </div>
 
-      <h3 style="font-size:15px; margin:24px 0 10px; color:var(--primary-pink);">📊 Platformadagi Barcha Sotuvlar va Buyurtmalar Tarixi</h3>
-      <div id="superGlobalOrdersList">
+      <h3 class="collapsible-header" onclick="toggleSection('superGlobalOrdersList')" style="font-size:15px; margin:24px 0 10px; color:var(--primary-pink); cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+        <span>📊 Platformadagi Barcha Sotuvlar va Buyurtmalar Tarixi <span id="superGlobalOrdersCount" style="color:var(--text-muted); font-size:12px;">(0)</span></span>
+        <span id="superGlobalOrdersListArrow">▶</span>
+      </h3>
+      <div id="superGlobalOrdersList" style="display:none;">
         <!-- Global Orders list -->
       </div>
 
-      <h3 style="font-size:15px; margin:24px 0 10px; color:var(--accent-gold);">👥 Bot Foydalanuvchilari Ro'yxati (Mijozlar)</h3>
-      <div id="superUsersList">
+      <h3 class="collapsible-header" onclick="toggleSection('superUsersList')" style="font-size:15px; margin:24px 0 10px; color:var(--accent-gold); cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+        <span>👥 Bot Foydalanuvchilari Ro'yxati (Mijozlar) <span id="superUsersCount" style="color:var(--text-muted); font-size:12px;">(0)</span></span>
+        <span id="superUsersListArrow">▶</span>
+      </h3>
+      <div id="superUsersList" style="display:none;">
         <!-- Users list -->
       </div>
 
-      <h3 style="font-size:15px; margin:24px 0 10px;">💵 To'lovlar Tarixi</h3>
-      <div id="superPayoutsList">
+      <h3 class="collapsible-header" onclick="toggleSection('superPayoutsList')" style="font-size:15px; margin:24px 0 10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+        <span>💵 To'lovlar Tarixi <span id="superPayoutsCount" style="color:var(--text-muted); font-size:12px;">(0)</span></span>
+        <span id="superPayoutsListArrow">▶</span>
+      </h3>
+      <div id="superPayoutsList" style="display:none;">
         <!-- Payouts history -->
       </div>
     </section>
@@ -227,9 +239,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="js/config.js?v=2.2.0"></script>
-  <script src="js/i18n.js?v=2.2.0"></script>
-  <script src="js/superadmin.js?v=2.2.0"></script>
+  <script src="js/config.js?v=2.3.0"></script>
+  <script src="js/i18n.js?v=2.3.0"></script>
+  <script src="js/superadmin.js?v=2.3.0"></script>
 
 
 

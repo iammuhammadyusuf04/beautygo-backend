@@ -11,7 +11,7 @@
       window.Telegram.WebApp.expand();
     }
   </script>
-  <script src="js/config.js?v=2.2.0"></script>
+  <script src="js/config.js?v=2.3.0"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
@@ -142,12 +142,18 @@
   </div>
 
   <!-- Orders -->
-  <h3 style="font-size:15px; margin:20px 0 10px;">📦 Do'kon Buyurtmalari</h3>
-  <div id="storeOrdersList"></div>
+  <h3 id="ordersHeader" style="font-size:15px; margin:20px 0 10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+    <span>📦 Do'kon Buyurtmalari <span id="storeOrdersCount" style="color:#D1B3C4; font-size:12px;">(0)</span></span>
+    <span id="storeOrdersListArrow">▶</span>
+  </h3>
+  <div id="storeOrdersList" style="display:none;"></div>
 
   <!-- Products -->
-  <h3 style="font-size:15px; margin:24px 0 10px;">🛍️ Mahsulotlar Ro'yxati</h3>
-  <div id="storeProductsList"></div>
+  <h3 id="productsHeader" style="font-size:15px; margin:24px 0 10px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+    <span>🛍️ Mahsulotlar Ro'yxati <span id="storeProductsCount" style="color:#D1B3C4; font-size:12px;">(0)</span></span>
+    <span id="storeProductsListArrow">▶</span>
+  </h3>
+  <div id="storeProductsList" style="display:none;"></div>
 
 </div>
 
@@ -354,6 +360,11 @@ async function loadDashboard() {
       const ordData = await ordRes.json();
       const prodData = await prodRes.json();
 
+      const ordersCountEl = document.getElementById('storeOrdersCount');
+      if (ordersCountEl) ordersCountEl.textContent = '(' + ((ordData.orders || []).length) + ')';
+      const productsCountEl = document.getElementById('storeProductsCount');
+      if (productsCountEl) productsCountEl.textContent = '(' + ((prodData.products || []).length) + ')';
+
       // Orders
       const ordList = document.getElementById('storeOrdersList');
       if (!ordData.orders || ordData.orders.length === 0) {
@@ -439,6 +450,16 @@ async function updateOrderStatus(orderId, status) {
     body: JSON.stringify({ status })
   });
   loadDashboard();
+}
+
+// ---- COLLAPSIBLE SECTION TOGGLE (Buyurtmalar/Mahsulotlar start collapsed, showing just a count) ----
+function toggleSection(listId) {
+  const el = document.getElementById(listId);
+  const arrow = document.getElementById(listId + 'Arrow');
+  if (!el) return;
+  const isHidden = el.style.display === 'none';
+  el.style.display = isHidden ? 'block' : 'none';
+  if (arrow) arrow.textContent = isHidden ? '▼' : '▶';
 }
 
 // ---- DELETE PRODUCT ----
@@ -533,6 +554,12 @@ document.addEventListener('DOMContentLoaded', async function() {
   } catch(e) { console.error('init-user error:', e); }
 
   await loadDashboard();
+
+  // ---- Collapsible section headers ----
+  const ordersHeaderEl = document.getElementById('ordersHeader');
+  if (ordersHeaderEl) ordersHeaderEl.addEventListener('click', function() { toggleSection('storeOrdersList'); });
+  const productsHeaderEl = document.getElementById('productsHeader');
+  if (productsHeaderEl) productsHeaderEl.addEventListener('click', function() { toggleSection('storeProductsList'); });
 
   // ---- Tahrirlash (Store Profile) button ----
   document.getElementById('btnEditStore').addEventListener('click', function() {
