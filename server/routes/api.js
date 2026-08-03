@@ -73,8 +73,8 @@ async function getOrCreateActiveStore(ownerTelegramId = SUPER_ADMIN_ID) {
   if (!store) {
     const result = await dbAsync.run(
       `INSERT INTO stores (owner_telegram_id, store_name, description, logo_url, commission_margin, status)
-       VALUES (?, 'BeautyGo Boutique', 'Ayollar parfyum va brend kiyimlari', 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=200&q=80', 10.0, 'ACTIVE')`,
-      [String(ownerTelegramId)]
+       VALUES (?, 'BeautyGo Boutique', 'Ayollar parfyum va brend kiyimlari', ?, 10.0, 'ACTIVE')`,
+      [String(ownerTelegramId), 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=200&q=80']
     );
     store = await dbAsync.get('SELECT * FROM stores WHERE id = ?', [result.lastID]);
   }
@@ -200,11 +200,17 @@ router.get('/products', async (req, res) => {
     // ever sees active ones.
     const includeInactive = store_id ? await canAccessStore(req.authedTelegramId, store_id) : false;
 
+    // NOTE: no literal "?" characters allowed anywhere in this SQL text (not
+    // even inside string literals, e.g. a fallback image URL's query string)
+    // — toPostgres() blindly converts every "?" it finds into a numbered
+    // bind placeholder, which corrupts the query and previously caused
+    // "could not determine data type of parameter $1". Default/fallback
+    // values are applied in JS after the query instead.
     let sql = `SELECT p.id, p.store_id, p.title_uz, p.title_ru, p.price, p.category, p.sizes, p.image_url, p.images_json,
                p.created_at, p.is_active, COALESCE(p.sold_count, 0) as sold_count,
                COALESCE(r.avg_rating, 0) as avg_rating, COALESCE(r.review_count, 0) as review_count,
                COALESCE(s.store_name, 'BeautyGo Boutique') as store_name,
-               COALESCE(s.logo_url, 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=200&q=80') as store_logo
+               s.logo_url as store_logo
                FROM products p
                LEFT JOIN stores s ON p.store_id = s.id
                LEFT JOIN (SELECT product_id, AVG(rating) as avg_rating, COUNT(*) as review_count FROM reviews GROUP BY product_id) r ON r.product_id = p.id
@@ -248,6 +254,7 @@ router.get('/products', async (req, res) => {
       }
       // Use first image from images_json if available, otherwise fall back to image_url
       const displayImage = (images && images.length > 0) ? images[0] : (p.image_url || 'images/logo.jpg');
+      const storeLogo = p.store_logo || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=200&q=80';
 
       const avgRating = parseFloat(p.avg_rating) || 0;
       const reviewCount = parseInt(p.review_count) || 0;
@@ -262,6 +269,7 @@ router.get('/products', async (req, res) => {
         ...p,
         sizes: p.sizes ? JSON.parse(p.sizes) : [],
         image_url: displayImage,
+        store_logo: storeLogo,
         images,
         avg_rating: Math.round(avgRating * 10) / 10,
         review_count: reviewCount,
