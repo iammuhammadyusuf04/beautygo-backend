@@ -143,11 +143,12 @@ if (bot) {
       const param = match && match[1] ? match[1].trim() : '';
 
       let user = await dbAsync.get('SELECT * FROM users WHERE telegram_id = ?', [telegramId]);
-      
+      const ownedStore = await dbAsync.get('SELECT id FROM stores WHERE owner_telegram_id = ?', [telegramId]);
+      const isSuperAdminUser = telegramId === SUPER_ADMIN_ID || username.toLowerCase() === 'muhammadyusuf';
+
       let role = 'USER';
-      if (telegramId === SUPER_ADMIN_ID || username.toLowerCase() === 'muhammadyusuf') {
-        role = 'SUPER_ADMIN';
-      }
+      if (isSuperAdminUser) role = 'SUPER_ADMIN';
+      else if (ownedStore) role = 'ADMIN';
 
       if (!user) {
         await dbAsync.run(
@@ -155,9 +156,14 @@ if (bot) {
           [telegramId, username, fullName, role]
         );
         user = { role };
-      } else if (role === 'SUPER_ADMIN' && user.role !== 'SUPER_ADMIN') {
-        await dbAsync.run('UPDATE users SET role = ? WHERE telegram_id = ?', ['SUPER_ADMIN', telegramId]);
-        user.role = 'SUPER_ADMIN';
+      } else if (user.role !== role && !(user.role === 'SUPER_ADMIN' && !isSuperAdminUser)) {
+        // Keeps the stored role in sync with reality: promotes to ADMIN/SUPER_ADMIN
+        // as needed, and demotes a stale ADMIN back to USER once their store has
+        // been reassigned/deleted (previously this never happened, so a former
+        // store owner kept showing as "DO'KON EGASI" forever). An existing
+        // SUPER_ADMIN is never auto-demoted just because this check misses them.
+        await dbAsync.run('UPDATE users SET role = ? WHERE telegram_id = ?', [role, telegramId]);
+        user.role = role;
       }
 
       // Deep linking to specific store

@@ -143,6 +143,11 @@ router.post('/init-user', async (req, res) => {
       } else if (isStoreOwner && user.role === 'USER') {
         await dbAsync.run('UPDATE users SET role = $1 WHERE telegram_id = $2', ['ADMIN', tid]);
         user.role = 'ADMIN';
+      } else if (!isStoreOwner && !isSuperAdminUser && user.role === 'ADMIN') {
+        // Self-heal a stale ADMIN role: their store was reassigned/deleted since
+        // they last logged in, so they're back to a plain customer.
+        await dbAsync.run('UPDATE users SET role = $1 WHERE telegram_id = $2', ['USER', tid]);
+        user.role = 'USER';
       }
 
       // Keep username/full_name in sync with the user's current Telegram profile
