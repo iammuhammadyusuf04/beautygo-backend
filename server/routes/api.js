@@ -773,6 +773,29 @@ router.get('/admin/store-stats/:store_id?', async (req, res) => {
   }
 });
 
+// Wipe all order/purchase/payout history platform-wide (products, stores and
+// accounts are untouched) — resets every sales/purchase figure back to zero.
+// Super Admin only, irreversible.
+router.delete('/super-admin/reset-orders', requireSuperAdmin, async (req, res) => {
+  try {
+    const orderCount = await dbAsync.get('SELECT COUNT(*) as cnt FROM orders');
+    const payoutCount = await dbAsync.get('SELECT COUNT(*) as cnt FROM payouts');
+
+    await dbAsync.run('DELETE FROM orders');
+    await dbAsync.run('DELETE FROM payouts');
+    await dbAsync.run('UPDATE products SET sold_count = 0');
+
+    res.json({
+      success: true,
+      deleted_orders: parseInt(orderCount?.cnt || 0),
+      deleted_payouts: parseInt(payoutCount?.cnt || 0),
+      message: "Barcha xarid/buyurtma va to'lovlar tarixi o'chirildi, mahsulotlar saqlanib qoldi."
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 10. Super Admin Dashboard & Hard Store Deletion — all require SUPER_ADMIN
 router.get('/super-admin/dashboard', requireSuperAdmin, async (req, res) => {
   try {
