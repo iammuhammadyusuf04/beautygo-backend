@@ -25,9 +25,12 @@ if (BOT_TOKEN) {
   console.log('ℹ️ BOT_TOKEN o`rnatilmagan. Bot rejimisiz faqat WebApp API ishlaydi.');
 }
 
+// Telegram legacy `Markdown` (v1, used throughout this file) only reserves
+// _ * ` [ — unlike MarkdownV2, it has no escape syntax for anything else, so
+// escaping extra characters just inserts literal backslashes into the message.
 function escapeMarkdown(str) {
   if (!str) return '';
-  return String(str).replace(/([_*[\]()~`>#+-=|{}.!])/g, '\\$1');
+  return String(str).replace(/([_*`\[])/g, '\\$1');
 }
 
 function getValidWebAppUrl(pathSuffix = '') {
