@@ -505,7 +505,8 @@ function addToCartDetailed(id, title, price, store_id, image_url) {
       store_id,
       image_url,
       size: selectedSize,
-      quantity: 1
+      quantity: 1,
+      selected: true
     });
   }
 
@@ -543,12 +544,15 @@ function renderCartItems() {
     return;
   }
 
+  const showCheckboxes = cart.length >= 2;
   let total = 0;
   list.innerHTML = cart.map((item, idx) => {
+    if (item.selected === undefined) item.selected = true;
     const subtotal = item.price * item.quantity;
-    total += subtotal;
+    if (item.selected) total += subtotal;
     return `
-      <div style="display:flex; gap:12px; align-items:center; background:rgba(255,255,255,0.04); padding:10px; border-radius:14px; margin-bottom:10px;">
+      <div style="display:flex; gap:12px; align-items:center; background:rgba(255,255,255,0.04); padding:10px; border-radius:14px; margin-bottom:10px; ${item.selected ? '' : 'opacity:0.5;'}">
+        ${showCheckboxes ? `<input type="checkbox" ${item.selected ? 'checked' : ''} onchange="toggleCartItemSelect(${idx}, this.checked)" style="width:20px; height:20px; flex-shrink:0; accent-color:var(--primary-pink);">` : ''}
         <img src="${item.image_url}" style="width:50px; height:50px; object-fit:cover; border-radius:10px;">
         <div style="flex-grow:1;">
           <div style="font-size:13px; font-weight:600;">${escapeHtml(item.title_uz)}</div>
@@ -564,7 +568,7 @@ function renderCartItems() {
     `;
   }).join('') + `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; font-size:16px; font-weight:800;">
-      <span>${i18n[currentLang].total}:</span>
+      <span>${i18n[currentLang].total}${showCheckboxes ? ' (tanlangan)' : ''}:</span>
       <span style="color:var(--primary-pink);">${total.toLocaleString()} so'm</span>
     </div>
   `;
@@ -600,8 +604,22 @@ function changeCartQty(idx, change) {
   renderCartItems();
 }
 
+function toggleCartItemSelect(idx, checked) {
+  if (!cart[idx]) return;
+  cart[idx].selected = checked;
+  renderCartItems();
+}
+window.toggleCartItemSelect = toggleCartItemSelect;
+
 async function submitCheckout() {
   const submitBtn = document.querySelector('#checkoutFormSection button');
+
+  const selectedItems = cart.filter(i => i.selected !== false);
+  if (selectedItems.length === 0) {
+    alert("Iltimos, sotib olmoqchi bo'lgan kamida bitta mahsulotni tanlang!");
+    return;
+  }
+
   setBtnLoading(submitBtn, true, 'Buyurtma berilmoqda...');
 
   const name = document.getElementById('checkoutName').value.trim();
@@ -629,7 +647,7 @@ async function submitCheckout() {
         customer_name: name,
         customer_phone: phone,
         customer_note: note,
-        items: cart
+        items: selectedItems
       })
     });
     const data = await res.json();
@@ -637,7 +655,8 @@ async function submitCheckout() {
 
     if (data.success) {
       alert("🎉 Buyurtmangiz qabul qilindi! Do'kon adminiga izohingiz va buyurtmangiz Telegram orqali yuborildi.");
-      cart = [];
+      // Only the purchased items leave the cart — anything left unchecked stays for later.
+      cart = cart.filter(i => i.selected === false);
       updateCartBadge();
       closeModal('cartModal');
       showTab('orders');

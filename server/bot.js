@@ -276,7 +276,23 @@ if (bot) {
       const orderId = data.replace(isApprove ? 'order_approve_' : 'order_cancel_', '');
 
       const newStatus = isApprove ? 'APPROVED' : 'CANCELLED';
+      const orderBefore = await dbAsync.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+      const wasApproved = orderBefore && orderBefore.status === 'APPROVED';
       await dbAsync.run('UPDATE orders SET status = ? WHERE id = ?', [newStatus, orderId]);
+
+      // Track real sales the moment an order is approved (mirrors the same
+      // guard in server/routes/api.js's PUT /orders/:id/status) — feeds the
+      // catalog's popularity ranking.
+      if (isApprove && !wasApproved && orderBefore) {
+        try {
+          const items = JSON.parse(orderBefore.items_json || '[]');
+          for (const item of items) {
+            if (item.id) {
+              await dbAsync.run('UPDATE products SET sold_count = COALESCE(sold_count,0) + ? WHERE id = ?', [item.quantity || 1, item.id]);
+            }
+          }
+        } catch (e) { console.error('sold_count update error:', e.message); }
+      }
 
       const order = await dbAsync.get('SELECT * FROM orders WHERE id = ?', [orderId]);
       const store = order ? await dbAsync.get('SELECT store_name FROM stores WHERE id = ?', [order.store_id]) : null;

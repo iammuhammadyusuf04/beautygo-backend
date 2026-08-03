@@ -194,6 +194,9 @@ async function initPg() {
     is_active INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
+  // Migration: track real sales per product, used to rank the catalog by
+  // actual popularity instead of only recency.
+  await dbAsync.run(`ALTER TABLE products ADD COLUMN sold_count INTEGER DEFAULT 0`);
 
   await dbAsync.run(`CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
@@ -314,6 +317,7 @@ function initSqlite(sqliteDb) {
   sqliteDb.run(`ALTER TABLE stores ADD COLUMN claim_token TEXT`, () => {});
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS store_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_telegram_id TEXT NOT NULL, store_id INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_telegram_id, store_id))`);
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, store_id INTEGER NOT NULL, title_uz TEXT NOT NULL, title_ru TEXT NOT NULL, description_uz TEXT, description_ru TEXT, price REAL NOT NULL, category TEXT NOT NULL, sizes TEXT, image_url TEXT, images_json TEXT, is_active INTEGER DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+  sqliteDb.run(`ALTER TABLE products ADD COLUMN sold_count INTEGER DEFAULT 0`, () => {});
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_telegram_id TEXT NOT NULL, customer_name TEXT NOT NULL, customer_phone TEXT NOT NULL, customer_note TEXT, store_id INTEGER NOT NULL, items_json TEXT NOT NULL, total_price REAL NOT NULL, commission_amount REAL DEFAULT 0, status TEXT DEFAULT 'PENDING', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS payouts (id INTEGER PRIMARY KEY AUTOINCREMENT, store_id INTEGER NOT NULL, amount REAL NOT NULL, note TEXT, status TEXT DEFAULT 'COMPLETED', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, user_telegram_id TEXT, user_name TEXT, rating INTEGER DEFAULT 5, comment TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);

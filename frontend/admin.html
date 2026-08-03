@@ -388,24 +388,31 @@ async function loadDashboard() {
       if (!prodData.products || prodData.products.length === 0) {
         prodList.innerHTML = '<div style="text-align:center;padding:20px;color:#D1B3C4;">Sizda hali mahsulotlar mavjud emas</div>';
       } else {
-        prodList.innerHTML = prodData.products.map(p => `
-          <div style="display:flex;gap:12px;align-items:center;background:rgba(255,255,255,0.04);padding:10px;border-radius:12px;margin-bottom:8px;">
+        prodList.innerHTML = prodData.products.map(p => {
+          const isActive = p.is_active === undefined || p.is_active === null || !!p.is_active;
+          return `
+          <div style="display:flex;gap:12px;align-items:center;background:rgba(255,255,255,0.04);padding:10px;border-radius:12px;margin-bottom:8px;${isActive ? '' : 'opacity:0.5;'}">
             <img src="${p.image_url || 'images/logo.jpg'}" style="width:45px;height:45px;object-fit:cover;border-radius:8px;">
             <div style="flex-grow:1;">
-              <div style="font-size:13px;font-weight:600;">${escHtml(p.title_uz)}</div>
+              <div style="font-size:13px;font-weight:600;">${escHtml(p.title_uz)} ${isActive ? '' : '<span style="font-size:10px;color:#E67E22;">(vaqtincha o\'chirilgan)</span>'}</div>
               <div style="font-size:11px;color:#FF4D8D;">${p.price.toLocaleString()} so'm</div>
             </div>
             <div style="display:flex;gap:6px;">
+              <button class="role-btn" style="background:${isActive ? '#8E44AD' : '#2ECC71'};padding:6px 10px;" data-toggle="${p.id}" data-active="${isActive ? '1' : '0'}" title="${isActive ? "Vaqtincha o'chirish" : 'Qayta yoqish'}"><i class="fa-solid ${isActive ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
               <button class="role-btn" style="background:#FF4D8D;padding:6px 10px;" data-edit="${p.id}"><i class="fa-solid fa-pen"></i></button>
               <button class="role-btn" style="background:#E74C3C;padding:6px 10px;" data-del="${p.id}"><i class="fa-solid fa-trash"></i></button>
             </div>
-          </div>`).join('');
+          </div>`;
+        }).join('');
 
         prodList.querySelectorAll('[data-edit]').forEach(btn => {
           btn.addEventListener('click', function() { openEditProductModal(this.dataset.edit); });
         });
         prodList.querySelectorAll('[data-del]').forEach(btn => {
           btn.addEventListener('click', function() { deleteProduct(this.dataset.del); });
+        });
+        prodList.querySelectorAll('[data-toggle]').forEach(btn => {
+          btn.addEventListener('click', function() { toggleProductActive(this.dataset.toggle, this.dataset.active === '1'); });
         });
       }
     } else {
@@ -439,6 +446,20 @@ async function deleteProduct(productId) {
   if (!confirm("Mahsulotni o'chirmoqchimisiz?")) return;
   await apiFetch('/api/products/' + productId, { method: 'DELETE' });
   loadDashboard();
+}
+
+// ---- TOGGLE PRODUCT VISIBILITY (temporary hide/show, not a delete) ----
+async function toggleProductActive(productId, currentlyActive) {
+  try {
+    await apiFetch('/api/products/' + productId + '/active', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !currentlyActive })
+    });
+    loadDashboard();
+  } catch (err) {
+    alert('Xatolik: ' + err.message);
+  }
 }
 
 // ---- OPEN EDIT PRODUCT MODAL ----

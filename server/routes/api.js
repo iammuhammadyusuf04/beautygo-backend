@@ -193,26 +193,42 @@ router.post('/init-user', async (req, res) => {
 router.get('/products', async (req, res) => {
   try {
     const { category, search, store_id } = req.query;
+
+    // Store owners/Super Admin managing their own store's product list also
+    // need to see temporarily-hidden (is_active=0) products, so they can turn
+    // them back on. The public catalog (no store_id, or not your store) only
+    // ever sees active ones.
+    const includeInactive = store_id ? await canAccessStore(req.authedTelegramId, store_id) : false;
+
     let sql = `SELECT p.id, p.store_id, p.title_uz, p.title_ru, p.price, p.category, p.sizes, p.image_url, p.images_json,
+               p.created_at, p.is_active, COALESCE(p.sold_count, 0) as sold_count,
+               COALESCE(r.avg_rating, 0) as avg_rating, COALESCE(r.review_count, 0) as review_count,
                COALESCE(s.store_name, 'BeautyGo Boutique') as store_name,
                COALESCE(s.logo_url, 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=200&q=80') as store_logo
                FROM products p
                LEFT JOIN stores s ON p.store_id = s.id
-               WHERE (p.is_active = 1 OR p.is_active IS NULL)`;
+               LEFT JOIN (SELECT product_id, AVG(rating) as avg_rating, COUNT(*) as review_count FROM reviews GROUP BY product_id) r ON r.product_id = p.id
+               WHERE 1=1`;
+    if (!includeInactive) {
+      sql += ` AND (p.is_active = 1 OR p.is_active IS NULL)`;
+    }
     let params = [];
 
+    // Plain `?` placeholders + standard SQL functions (CAST, LOWER/LIKE)
+    // throughout — the previous PostgreSQL-only syntax (`$N::text`, `ILIKE`)
+    // broke this endpoint whenever `store_id` was passed against the local
+    // SQLite database (used in dev), which SQLite has no equivalent for.
     if (category && category !== 'All') {
-      params.push(category);
-      sql += ` AND (p.category = $${params.length}::text OR LOWER(p.category) = LOWER($${params.length}::text))`;
+      sql += ` AND (p.category = ? OR LOWER(p.category) = LOWER(?))`;
+      params.push(category, category);
     }
     if (store_id) {
-      params.push(store_id);
-      sql += ` AND (p.store_id = $${params.length} OR p.store_id::text = $${params.length}::text)`;
+      sql += ` AND (p.store_id = ? OR CAST(p.store_id AS TEXT) = ?)`;
+      params.push(store_id, String(store_id));
     }
     if (search) {
-      params.push(`%${search}%`);
-      const searchIdx = params.length;
-      sql += ` AND (p.title_uz ILIKE $${searchIdx}::text OR p.title_ru ILIKE $${searchIdx}::text)`;
+      sql += ` AND (LOWER(p.title_uz) LIKE LOWER(?) OR LOWER(p.title_ru) LIKE LOWER(?))`;
+      params.push(`%${search}%`, `%${search}%`);
     }
 
     sql += ' ORDER BY p.id DESC';
@@ -220,6 +236,10 @@ router.get('/products', async (req, res) => {
 
     const products = await dbAsync.all(sql, params);
 
+    // Rank like a real marketplace: rating and actual sales matter more than
+    // just "newest first", but a brand-new product with no track record yet
+    // still gets a temporary visibility boost so it isn't buried forever.
+    const now = Date.now();
     const formatted = products.map(p => {
       // Parse images_json and use first real image as display image
       let images = [];
@@ -228,13 +248,30 @@ router.get('/products', async (req, res) => {
       }
       // Use first image from images_json if available, otherwise fall back to image_url
       const displayImage = (images && images.length > 0) ? images[0] : (p.image_url || 'images/logo.jpg');
+
+      const avgRating = parseFloat(p.avg_rating) || 0;
+      const reviewCount = parseInt(p.review_count) || 0;
+      const soldCount = parseInt(p.sold_count) || 0;
+      const ageDays = p.created_at ? (now - new Date(p.created_at).getTime()) / 86400000 : 999;
+      const newnessBoost = ageDays <= 3 ? 15 : (ageDays <= 7 ? 6 : 0);
+      // Weighted so a handful of great reviews + real sales outrank pure recency,
+      // while still giving fresh listings a fair shot at being seen.
+      const rankScore = (avgRating * 20) + (reviewCount * 3) + (soldCount * 2) + newnessBoost;
+
       return {
         ...p,
         sizes: p.sizes ? JSON.parse(p.sizes) : [],
         image_url: displayImage,
-        images
+        images,
+        avg_rating: Math.round(avgRating * 10) / 10,
+        review_count: reviewCount,
+        sold_count: soldCount,
+        _rank_score: rankScore
       };
     });
+
+    formatted.sort((a, b) => b._rank_score - a._rank_score || b.id - a.id);
+    formatted.forEach(p => delete p._rank_score);
 
     res.json({ success: true, count: formatted.length, products: formatted });
   } catch (err) {
@@ -393,6 +430,27 @@ router.put('/products/:id', async (req, res) => {
     res.json({ success: true, message: "Mahsulot yangilandi!" });
   } catch (err) {
     console.error('PUT /products error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Temporarily hide/show a product (doesn't delete it) — hidden products are
+// excluded from the catalog/ranking (GET /products already filters on
+// is_active) but stay editable and can be turned back on anytime.
+router.put('/products/:id/active', async (req, res) => {
+  try {
+    const product = await dbAsync.get('SELECT store_id, is_active FROM products WHERE id = ?', [req.params.id]);
+    if (!product) return res.status(404).json({ error: 'Mahsulot topilmadi!' });
+    if (!(await canAccessStore(req.authedTelegramId, product.store_id))) {
+      return res.status(403).json({ error: "Ruxsat etilmagan! Bu mahsulot sizga tegishli emas." });
+    }
+
+    const { is_active } = req.body;
+    const newActive = is_active !== undefined ? (is_active ? 1 : 0) : (product.is_active ? 0 : 1);
+    await dbAsync.run('UPDATE products SET is_active = ? WHERE id = ?', [newActive, req.params.id]);
+
+    res.json({ success: true, is_active: !!newActive, message: newActive ? "Mahsulot qayta yoqildi!" : "Mahsulot vaqtincha o'chirildi!" });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -605,7 +663,23 @@ router.put('/orders/:id/status', async (req, res) => {
     }
 
     const { status } = req.body;
+    const wasApproved = order.status === 'APPROVED';
     await dbAsync.run('UPDATE orders SET status = ? WHERE id = ?', [status, orderId]);
+
+    // Track real sales the moment an order is approved (not at checkout —
+    // a pending/cancelled order isn't a real sale). Feeds the catalog's
+    // popularity ranking. Guarded so re-approving an already-approved order
+    // (or any other repeat call) never double-counts.
+    if (status === 'APPROVED' && !wasApproved) {
+      try {
+        const items = JSON.parse(order.items_json || '[]');
+        for (const item of items) {
+          if (item.id) {
+            await dbAsync.run('UPDATE products SET sold_count = COALESCE(sold_count,0) + ? WHERE id = ?', [item.quantity || 1, item.id]);
+          }
+        }
+      } catch (e) { console.error('sold_count update error:', e.message); }
+    }
 
     // Send Telegram Notification directly to Customer
     try {
