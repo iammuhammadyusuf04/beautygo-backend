@@ -497,6 +497,22 @@ document.addEventListener('DOMContentLoaded', async function() {
     currentUser.full_name = ((u.first_name || '') + ' ' + (u.last_name || '')).trim();
   }
 
+  // TEMP DIAGNOSTIC — shows exactly what Telegram gave us, so we can see why
+  // identity isn't resolving on a real device. Safe to remove once fixed.
+  try {
+    const diag = document.createElement('div');
+    diag.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#000;color:#0f0;font-size:10px;padding:8px;font-family:monospace;white-space:pre-wrap;word-break:break-all;max-height:40vh;overflow:auto;';
+    diag.textContent =
+      'tg exists: ' + (!!tg) + '\n' +
+      'tg.platform: ' + (tg ? tg.platform : 'n/a') + '\n' +
+      'tg.version: ' + (tg ? tg.version : 'n/a') + '\n' +
+      'tg.initData length: ' + (tg && tg.initData ? tg.initData.length : 0) + '\n' +
+      'tg.initData (first 200 chars): ' + (tg && tg.initData ? tg.initData.slice(0,200) : '(empty)') + '\n' +
+      'tg.initDataUnsafe.user: ' + (tg && tg.initDataUnsafe ? JSON.stringify(tg.initDataUnsafe.user) : 'n/a') + '\n' +
+      'currentUser.telegram_id: ' + currentUser.telegram_id;
+    document.body.appendChild(diag);
+  } catch (e) {}
+
   // Init user
   try {
     const res = await apiFetch('/api/init-user', {
