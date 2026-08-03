@@ -231,17 +231,30 @@
 
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 
-let currentUser = { telegram_id: '8888888', username: 'beauty_owner', full_name: "Do'kon Egasi", role: 'ADMIN' };
-let userStore = { id: 4, store_name: "Ms beauty", description: "Qizlar asallar", logo_url: "images/logo.jpg" };
+// No hardcoded placeholder identity/store here on purpose: this used to
+// default to telegram_id '8888888' and store id 4 ("Ms beauty") for anyone,
+// regardless of who was actually testing — which store was theirs is always
+// resolved server-side, from a verified Telegram identity.
+let currentUser = { telegram_id: '', username: '', full_name: '', role: 'ADMIN' };
+let userStore = null;
 let uploadedImagesList = [];
 
-// Universal fetch wrapper with Production API prefix and Auto-Retry
+// Universal fetch wrapper with Production API prefix, Telegram identity, and Auto-Retry
 async function apiFetch(url, opts = {}, retries = 3) {
   let targetUrl = url;
   if (!url.startsWith('http')) {
     const baseUrl = (window.API_BASE_URL || localStorage.getItem('BG_BACKEND_URL') || 'https://beautygo-backend-p5q9.onrender.com').replace(/\/+$/, '');
     targetUrl = baseUrl ? `${baseUrl}${url}` : url;
   }
+
+  if (currentUser && currentUser.telegram_id && !targetUrl.includes('telegram_id=')) {
+    const sep = targetUrl.includes('?') ? '&' : '?';
+    targetUrl += `${sep}telegram_id=${encodeURIComponent(currentUser.telegram_id)}`;
+  }
+  opts.headers = {
+    ...(opts.headers || {}),
+    ...(tg && tg.initData ? { 'X-Telegram-Init-Data': tg.initData } : {})
+  };
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
@@ -317,9 +330,9 @@ function compressImageFile(file, maxSize, quality) {
 
 // ---- LOAD DASHBOARD ----
 async function loadDashboard() {
-  const storeId = userStore.id || 4;
+  const activeStoreId = (userStore && userStore.id) ? userStore.id : '';
   try {
-    const statsRes = await apiFetch('/api/admin/store-stats/' + storeId);
+    const statsRes = await apiFetch(activeStoreId ? '/api/admin/store-stats/' + activeStoreId : '/api/admin/store-stats');
     const stats = await statsRes.json();
 
     if (stats.success && stats.store) {
@@ -395,6 +408,16 @@ async function loadDashboard() {
           btn.addEventListener('click', function() { deleteProduct(this.dataset.del); });
         });
       }
+    } else {
+      const container = document.querySelector('.app-container');
+      if (container) {
+        container.innerHTML = `
+          <div style="text-align:center; padding:60px 20px;">
+            <div style="font-size:64px; margin-bottom:16px;">⛔</div>
+            <h2 style="font-size:20px; color:#E74C3C; margin-bottom:10px;">Kirish Taqiqlangan</h2>
+            <p style="font-size:14px; color:#D1B3C4;">${escHtml(stats.error || "Siz do'kon egasi emassiz yoki sizning do'koningiz o'chirilgan!")}</p>
+          </div>`;
+      }
     }
   } catch (err) {
     console.error('Dashboard load error:', err);
@@ -464,6 +487,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     currentUser.telegram_id = String(u.id);
     currentUser.username = u.username || '';
     currentUser.full_name = ((u.first_name || '') + ' ' + (u.last_name || '')).trim();
+  } else {
+    // No real Telegram WebApp session — there is no way to know who this is,
+    // so don't silently fall back to a fixed test identity (that used to make
+    // every non-Telegram visit look like one specific store, regardless of
+    // who was actually testing).
+    const container = document.querySelector('.app-container');
+    if (container) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:60px 20px;">
+          <div style="font-size:64px; margin-bottom:16px;">🔒</div>
+          <h2 style="font-size:20px; color:#E74C3C; margin-bottom:10px;">Telegram orqali oching</h2>
+          <p style="font-size:14px; color:#D1B3C4;">Bu sahifani faqat Telegram botidagi "🛍️ Do'kon Egasi Paneli" tugmasi orqali ochish mumkin.</p>
+        </div>`;
+    }
+    return;
   }
 
   // Init user
@@ -548,6 +586,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   // ---- Save Store Profile Form ----
   document.getElementById('storeProfileForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+    if (!userStore || !userStore.id) { alert("Sizga tegishli do'kon topilmadi!"); return; }
     const btn = document.getElementById('btnSaveStore');
     setBtnLoading(btn, true, 'Saqlanmoqda...');
     try {
@@ -573,6 +612,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   // ---- Save Product Form ----
   document.getElementById('productForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+    if (!userStore || !userStore.id) { alert("Sizga tegishli do'kon topilmadi!"); return; }
     const btn = document.getElementById('btnSaveProduct');
     setBtnLoading(btn, true, 'Saqlanmoqda...');
     const editId = document.getElementById('editProductId').value;
