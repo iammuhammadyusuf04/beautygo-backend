@@ -68,10 +68,15 @@ async function getRoleKeyboard(telegramId) {
     keyboard.push([{ text: "👑 Super Admin Portali", web_app: { url: getValidWebAppUrl('/superadmin') } }]);
   }
 
+  // Inline keyboard, not a reply (custom) keyboard: reply-keyboard web_app
+  // buttons were confirmed (via on-device diagnostics) to launch the Mini App
+  // with a completely empty tg.initData on real Telegram iOS clients, making
+  // it impossible to identify the user server-side. Inline web_app buttons
+  // are the standard, reliable way to launch a Mini App with initData intact
+  // — this is also what the store_/product_/claim_ deep links already use.
   return {
     reply_markup: {
-      keyboard: keyboard,
-      resize_keyboard: true
+      inline_keyboard: keyboard
     }
   };
 }
@@ -246,6 +251,15 @@ if (bot) {
         `"BeautyGo" Mini Marketplace Telegram WebApp-ga xush kelibsiz!\n\n` +
         `📌 *Sizning rolingiz*: \`${roleDisplayName}\`\n\n` +
         `Quyidagi tugmalardan birini bosib, WebApp interfeysini ochishingiz mumkin 👇`;
+
+      // One-time cleanup of the old persistent bottom keyboard (from before
+      // the switch to inline buttons) — its web_app buttons were the ones
+      // launching with empty initData, so leaving it visible would tempt
+      // people back into the broken path.
+      try {
+        await bot.sendMessage(chatId, '🔄', { reply_markup: { remove_keyboard: true } })
+          .then(m => bot.deleteMessage(chatId, m.message_id).catch(() => {}));
+      } catch (e) {}
 
       await bot.sendMessage(chatId, welcomeMsg, { parse_mode: 'Markdown', ...opts });
       console.log(`✅ Telegram /start javobi yuborildi: ${chatId} (Role: ${user.role})`);
