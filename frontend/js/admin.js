@@ -52,13 +52,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUser.telegram_id = String(u.id);
     currentUser.username = u.username || '';
     currentUser.full_name = `${u.first_name || ''} ${u.last_name || ''}`.trim();
+    await initUser();
   } else {
-    currentUser.telegram_id = '8888888';
-    currentUser.username = 'beauty_owner';
-    currentUser.full_name = "Zuhra Do'kon Egasi";
+    // No real Telegram WebApp session here — there is no way to know who this
+    // is. This used to silently pretend to be one fixed test account
+    // (telegram_id '8888888'), which made every non-Telegram visit look like
+    // it belonged to that one specific store, regardless of who was actually
+    // testing — showing "bu do'kon sizga tegishli emas" for everyone else.
+    const container = document.querySelector('.app-container');
+    if (container) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:60px 20px;">
+          <div style="font-size:64px; margin-bottom:16px;">🔒</div>
+          <h2 style="font-family:var(--font-title); font-size:20px; color:#E74C3C; margin-bottom:10px;">Telegram orqali oching</h2>
+          <p style="font-size:14px; color:var(--text-muted);">Bu sahifani faqat Telegram botidagi "🛍️ Do'kon Egasi Paneli" tugmasi orqali ochish mumkin.</p>
+        </div>
+      `;
+    }
   }
-
-  await initUser();
 });
 
 async function initUser() {
