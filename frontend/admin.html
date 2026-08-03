@@ -481,27 +481,20 @@ function renderImagePreviews() {
 // ===================== EVENT LISTENERS (No inline onclick!) =====================
 
 document.addEventListener('DOMContentLoaded', async function() {
-  // Read Telegram user
+  // Read Telegram user. Some Telegram clients populate initDataUnsafe.user a
+  // beat after DOMContentLoaded, so retry briefly instead of giving up
+  // immediately. Either way, we never hard-block the page here anymore — if
+  // there's genuinely no valid identity, the server's own ownership check
+  // (loadDashboard's "Kirish Taqiqlangan" branch below) reports the real
+  // reason instead of us guessing "not opened via Telegram".
+  for (let i = 0; i < 5 && !(tg && tg.initDataUnsafe && tg.initDataUnsafe.user); i++) {
+    await new Promise(r => setTimeout(r, 200));
+  }
   if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
     const u = tg.initDataUnsafe.user;
     currentUser.telegram_id = String(u.id);
     currentUser.username = u.username || '';
     currentUser.full_name = ((u.first_name || '') + ' ' + (u.last_name || '')).trim();
-  } else {
-    // No real Telegram WebApp session — there is no way to know who this is,
-    // so don't silently fall back to a fixed test identity (that used to make
-    // every non-Telegram visit look like one specific store, regardless of
-    // who was actually testing).
-    const container = document.querySelector('.app-container');
-    if (container) {
-      container.innerHTML = `
-        <div style="text-align:center; padding:60px 20px;">
-          <div style="font-size:64px; margin-bottom:16px;">🔒</div>
-          <h2 style="font-size:20px; color:#E74C3C; margin-bottom:10px;">Telegram orqali oching</h2>
-          <p style="font-size:14px; color:#D1B3C4;">Bu sahifani faqat Telegram botidagi "🛍️ Do'kon Egasi Paneli" tugmasi orqali ochish mumkin.</p>
-        </div>`;
-    }
-    return;
   }
 
   // Init user
