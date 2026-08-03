@@ -5,10 +5,10 @@ let currentUser = {
   full_name: 'Muhammadyusuf (Super Admin)',
   role: 'SUPER_ADMIN'
 };
-if (typeof currentLang === 'undefined') {
-  var currentLang = 'uz';
-}
-
+// NOTE: `currentLang` is declared with `let` in i18n.js (loaded before this
+// file) — redeclaring it here with `var` throws a fatal SyntaxError at parse
+// time ("Identifier 'currentLang' has already been declared"), which used to
+// stop this entire script from running at all (no buttons, no data, nothing).
 
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 
@@ -147,8 +147,9 @@ async function loadSuperAdminDashboard() {
                   <div style="font-weight:700; font-size:15px; color:var(--accent-gold);">${escapeHtml(s.store_name)}</div>
                   <div style="font-size:11px; color:var(--text-muted);">Egasi: ${escapeHtml(s.owner_name || 'Admin')} (ID: ${s.owner_telegram_id})</div>
                 </div>
-                <div style="display:flex; gap:6px;">
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
                   <button class="role-btn" style="background:#2ECC71; font-size:11px;" onclick="openPayoutModal(${s.id})">💵 Pul Olish</button>
+                  <button class="role-btn" style="background:#3498DB; font-size:11px;" onclick="openChangeOwnerModal(${s.id}, '${escapeHtml(String(s.owner_telegram_id || ''))}')">🔄 Egasi</button>
                   <button class="role-btn" style="background:#E74C3C; font-size:11px;" onclick="deleteStore(${s.id}, '${escapeHtml(s.store_name)}')">🗑️ O'chirish</button>
                 </div>
               </div>
@@ -349,6 +350,44 @@ window.openPayoutModal = function(storeId) {
   document.getElementById('payoutStoreId').value = storeId;
   document.getElementById('payoutForm').reset();
   openModal('payoutModal');
+};
+
+// Change Store Owner (Super Admin)
+window.openChangeOwnerModal = function(storeId, currentOwnerId) {
+  document.getElementById('changeOwnerStoreId').value = storeId;
+  document.getElementById('currentOwnerDisplay').value = currentOwnerId;
+  document.getElementById('newOwnerIdInput').value = '';
+  openModal('changeOwnerModal');
+};
+
+window.submitChangeOwner = async function(e) {
+  e.preventDefault();
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  setBtnLoading(submitBtn, true, 'Almashtirilmoqda...');
+
+  const storeId = document.getElementById('changeOwnerStoreId').value;
+  const new_owner_telegram_id = document.getElementById('newOwnerIdInput').value.trim();
+
+  try {
+    const res = await apiFetch(`/api/super-admin/stores/${storeId}/owner`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_owner_telegram_id })
+    });
+    const data = await res.json();
+    setBtnLoading(submitBtn, false);
+
+    if (data.success) {
+      alert("✅ Do'kon egasi muvaffaqiyatli almashtirildi!");
+      closeModal('changeOwnerModal');
+      loadSuperAdminDashboard();
+    } else {
+      alert(data.error || "Egasini almashtirishda xatolik yuz berdi");
+    }
+  } catch (err) {
+    setBtnLoading(submitBtn, false);
+    alert("Xatolik: " + err.message);
+  }
 };
 
 window.submitPayout = async function(e) {

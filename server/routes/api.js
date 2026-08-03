@@ -126,8 +126,6 @@ router.post('/init-user', async (req, res) => {
     }
     const isStoreOwner = !!ownedStore;
 
-    const activeStore = await getOrCreateActiveStore(tid);
-
     if (!user) {
       let role = 'USER';
       if (isSuperAdminUser) role = 'SUPER_ADMIN';
@@ -155,7 +153,17 @@ router.post('/init-user', async (req, res) => {
       }
     }
 
-    const returnStore = (user.role === 'ADMIN' && ownedStore) ? ownedStore : activeStore;
+    // Only ever hand back a store the caller actually owns (or, for the Super
+    // Admin bootstrap flow, a guaranteed-to-exist placeholder store). An
+    // ADMIN-role user who doesn't currently own any store must NOT be shown
+    // someone else's store — that used to leak another owner's store details
+    // and cause a confusing "bu mening do'konim emas" experience.
+    let returnStore = null;
+    if (user.role === 'ADMIN' && ownedStore) {
+      returnStore = ownedStore;
+    } else if (user.role === 'SUPER_ADMIN') {
+      returnStore = await getOrCreateActiveStore(tid);
+    }
 
     res.json({ success: true, user, store: returnStore });
   } catch (err) {
@@ -804,6 +812,58 @@ router.delete('/super-admin/stores/:id', requireSuperAdmin, async (req, res) => 
   }
 });
 
+
+// Reassign a store's owner (Super Admin) — resolves the new owner by exact
+// telegram_id first, then by username; creates a placeholder ADMIN user row
+// if they've never logged in yet (same pattern as POST /super-admin/stores).
+router.put('/super-admin/stores/:id/owner', requireSuperAdmin, async (req, res) => {
+  try {
+    const storeId = req.params.id;
+    const { new_owner_telegram_id } = req.body;
+
+    if (!new_owner_telegram_id) {
+      return res.status(400).json({ error: "Yangi egasining Telegram ID yoki username-i majburiy!" });
+    }
+
+    const store = await dbAsync.get('SELECT * FROM stores WHERE id = ?', [storeId]);
+    if (!store) {
+      return res.status(404).json({ error: "Do'kon topilmadi!" });
+    }
+
+    const oldOwnerId = store.owner_telegram_id;
+    const cleanNewOwner = String(new_owner_telegram_id).trim().replace(/^@/, '');
+
+    let newOwnerUser = await dbAsync.get(
+      'SELECT * FROM users WHERE telegram_id = $1 OR (username != $2 AND LOWER(username) = LOWER($3))',
+      [cleanNewOwner, '', cleanNewOwner]
+    );
+
+    let resolvedOwnerId = cleanNewOwner;
+    if (newOwnerUser) {
+      resolvedOwnerId = newOwnerUser.telegram_id;
+      await dbAsync.run('UPDATE users SET role = ? WHERE telegram_id = ?', ['ADMIN', resolvedOwnerId]);
+    } else {
+      await dbAsync.run(
+        'INSERT INTO users (telegram_id, username, full_name, role) VALUES (?, ?, ?, ?)',
+        [resolvedOwnerId, resolvedOwnerId, store.store_name + ' Egasi', 'ADMIN']
+      );
+    }
+
+    await dbAsync.run('UPDATE stores SET owner_telegram_id = ? WHERE id = ?', [resolvedOwnerId, storeId]);
+
+    // Demote the previous owner back to USER if they own no other stores
+    if (oldOwnerId && String(oldOwnerId) !== String(resolvedOwnerId)) {
+      const remaining = await dbAsync.get('SELECT COUNT(*) as cnt FROM stores WHERE owner_telegram_id = ?', [oldOwnerId]);
+      if (!remaining || remaining.cnt === 0) {
+        await dbAsync.run('UPDATE users SET role = ? WHERE telegram_id = ? AND role != ?', ['USER', String(oldOwnerId), 'SUPER_ADMIN']);
+      }
+    }
+
+    res.json({ success: true, message: "Do'kon egasi muvaffaqiyatli almashtirildi!" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.put('/super-admin/store-margin', requireSuperAdmin, async (req, res) => {
   try {

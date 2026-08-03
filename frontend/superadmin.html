@@ -172,6 +172,26 @@
     </div>
   </div>
 
+  <!-- Modal: Change Store Owner (Super Admin) -->
+  <div class="modal-overlay" id="changeOwnerModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('changeOwnerModal')">&times;</button>
+      <h2 style="font-family:var(--font-title); font-size:18px; margin-bottom:16px;">Do'kon Egasini Almashtirish</h2>
+      <form id="changeOwnerForm" onsubmit="submitChangeOwner(event)">
+        <input type="hidden" id="changeOwnerStoreId">
+        <div class="form-group">
+          <label class="form-label">Joriy Egasi (Telegram ID)</label>
+          <input type="text" class="form-input" id="currentOwnerDisplay" disabled>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Yangi Egasining Telegram ID yoki Username-i</label>
+          <input type="text" class="form-input" id="newOwnerIdInput" placeholder="99887766 yoki @username" required>
+        </div>
+        <button type="submit" class="btn-primary">Egasini Almashtirish</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Modal: Record Payout (Super Admin) -->
   <div class="modal-overlay" id="payoutModal">
     <div class="modal-content">

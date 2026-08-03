@@ -5,12 +5,11 @@ let currentUser = {
   full_name: '',
   role: 'ADMIN'
 };
-let userStore = {
-  id: 4,
-  store_name: "Ms beauty",
-  description: "Qizlar asallar",
-  logo_url: "images/logo.jpg"
-};
+// No hardcoded placeholder store here on purpose: which store (if any) this
+// account owns is resolved server-side in /init-user and /admin/store-stats.
+// A hardcoded fallback id here used to make non-owning accounts silently query
+// someone else's store and get rejected as "not yours".
+let userStore = null;
 let uploadedImagesList = [];
 
 const tg = window.Telegram ? window.Telegram.WebApp : null;
@@ -342,7 +341,12 @@ window.saveStoreProfile = async function(e) {
   const submitBtn = e.target.querySelector('button[type="submit"]');
   setBtnLoading(submitBtn, true, 'Saqlanmoqda...');
 
-  const storeId = userStore ? userStore.id : 4;
+  if (!userStore || !userStore.id) {
+    setBtnLoading(submitBtn, false);
+    alert("Sizga tegishli do'kon topilmadi!");
+    return;
+  }
+  const storeId = userStore.id;
   const store_name = document.getElementById('editStoreNameInput').value;
   const description = document.getElementById('editStoreDescInput').value;
   const logo_url = document.getElementById('editStoreLogoUrl').value;
@@ -421,7 +425,12 @@ window.saveProduct = async function(e) {
   const submitBtn = e.target.querySelector('button[type="submit"]');
   setBtnLoading(submitBtn, true, 'Saqlanmoqda...');
 
-  const storeId = userStore ? userStore.id : 4;
+  if (!userStore || !userStore.id) {
+    setBtnLoading(submitBtn, false);
+    alert("Sizga tegishli do'kon topilmadi!");
+    return;
+  }
+  const storeId = userStore.id;
   const editId = document.getElementById('editProductId').value;
 
   const payload = {
