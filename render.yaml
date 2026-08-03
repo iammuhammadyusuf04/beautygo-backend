@@ -10,7 +10,5 @@ services:
         value: 3000
       - key: BOT_TOKEN
         sync: false # Set manually in Render Dashboard -> Environment (never commit real tokens here)
-      - key: NETLIFY_URL
-        value: https://symphonious-narwhal-e76970.netlify.app
       - key: NODE_ENV
         value: production

@@ -33,9 +33,11 @@ function escapeMarkdown(str) {
   return String(str).replace(/([_*`\[])/g, '\\$1');
 }
 
+// Always points at the Render static site (auto-deployed from frontend/ on every
+// push). The old Netlify deployment is intentionally no longer used here — it
+// fell out of sync with frontend/ and its account ran out of deploy credits.
 function getValidWebAppUrl(pathSuffix = '') {
-  let url = process.env.NETLIFY_URL || 'https://beautygo-frontend.onrender.com';
-  url = url.trim().replace(/\/+$/, '');
+  const url = 'https://beautygo-frontend.onrender.com';
   return pathSuffix ? `${url}${pathSuffix}` : url;
 }
 
