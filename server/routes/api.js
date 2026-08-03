@@ -1,9 +1,20 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const { dbAsync } = require('../database');
-const { sendOrderNotificationToAdmin, broadcastNewProductNotification, sendCustomerOrderStatusNotification } = require('../bot');
+const { sendOrderNotificationToAdmin, broadcastNewProductNotification, sendCustomerOrderStatusNotification, getBotUsername } = require('../bot');
 const { verifyTelegramInitData } = require('../telegramAuth');
 const { SUPER_ADMIN_ID } = require('../constants');
+
+function generateClaimToken() {
+  return crypto.randomBytes(8).toString('hex');
+}
+
+async function buildClaimLink(token) {
+  const username = await getBotUsername();
+  if (!username) return null;
+  return `https://t.me/${username}?start=claim_${token}`;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Identity & Authorization
@@ -754,8 +765,38 @@ router.post('/super-admin/stores', requireSuperAdmin, async (req, res) => {
   try {
     let { owner_telegram_id, store_name, description, logo_url, commission_margin } = req.body;
 
-    if (!owner_telegram_id || !store_name) {
-      return res.status(400).json({ error: "owner_telegram_id (yoki Telegram Username) va store_name majburiy!" });
+    if (!store_name) {
+      return res.status(400).json({ error: "store_name majburiy!" });
+    }
+
+    // No owner id/username given: create the store unowned with a one-time
+    // invite link instead. This is the reliable path — the new seller's real
+    // Telegram id gets captured directly from a verified /start deep link
+    // (server/bot.js), never from the Super Admin typing/guessing an id or
+    // username that may not exactly match (no public username, typo, etc).
+    if (!owner_telegram_id || !String(owner_telegram_id).trim()) {
+      const claimToken = generateClaimToken();
+      const result = await dbAsync.run(
+        `INSERT INTO stores (owner_telegram_id, store_name, description, logo_url, commission_margin, status, claim_token)
+         VALUES (NULL, ?, ?, ?, ?, 'ACTIVE', ?)`,
+        [
+          store_name,
+          description || '',
+          logo_url || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=200&q=80',
+          parseFloat(commission_margin || 10.0),
+          claimToken
+        ]
+      );
+      const inviteLink = await buildClaimLink(claimToken);
+      return res.json({
+        success: true,
+        store_id: result.lastID,
+        claim_token: claimToken,
+        invite_link: inviteLink,
+        message: inviteLink
+          ? "Do'kon yaratildi! Taklif havolasini sellerga yuboring — u botda ochib, do'kon egasi bo'ladi."
+          : "Do'kon yaratildi, lekin taklif havolasini generatsiya qilib bo'lmadi (bot ulanmagan)."
+      });
     }
 
     const cleanOwnerInput = String(owner_telegram_id).trim().replace(/^@/, '');
@@ -787,6 +828,26 @@ router.post('/super-admin/stores', requireSuperAdmin, async (req, res) => {
     );
 
     res.json({ success: true, store_id: result.lastID, message: "Yangi do'kon va do'kon egasi muvaffaqiyatli yaratildi!" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate/refresh a one-time invite link for a store that has no confirmed
+// numeric owner yet (or to replace a lost link). Super Admin only.
+router.post('/super-admin/stores/:id/invite-link', requireSuperAdmin, async (req, res) => {
+  try {
+    const store = await dbAsync.get('SELECT * FROM stores WHERE id = ?', [req.params.id]);
+    if (!store) return res.status(404).json({ error: "Do'kon topilmadi!" });
+
+    const claimToken = generateClaimToken();
+    await dbAsync.run('UPDATE stores SET claim_token = ? WHERE id = ?', [claimToken, store.id]);
+    const inviteLink = await buildClaimLink(claimToken);
+
+    if (!inviteLink) {
+      return res.status(500).json({ error: "Taklif havolasini generatsiya qilib bo'lmadi (bot ulanmagan)." });
+    }
+    res.json({ success: true, claim_token: claimToken, invite_link: inviteLink });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

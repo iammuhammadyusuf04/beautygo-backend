@@ -152,8 +152,9 @@
       <h2 style="font-family:var(--font-title); font-size:18px; margin-bottom:16px;">Yangi Do'kon Qo'shish</h2>
       <form onsubmit="submitCreateStore(event)">
         <div class="form-group">
-          <label class="form-label">Do'kon Egasining Telegram ID-si</label>
-          <input type="text" class="form-input" id="newOwnerId" placeholder="99887766" required>
+          <label class="form-label">Do'kon Egasining Telegram ID-si (ixtiyoriy)</label>
+          <input type="text" class="form-input" id="newOwnerId" placeholder="Bilmasangiz bo'sh qoldiring — taklif havolasi yaratiladi">
+          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Bo'sh qoldirsangiz, seller Telegram ID/username'ini bilishingiz shart emas — tizim taklif havolasi yaratadi, seller botda shu havolani ochsa, do'kon avtomatik unga bog'lanadi.</div>
         </div>
         <div class="form-group">
           <label class="form-label">Do'kon Nomi</label>
@@ -169,6 +170,19 @@
         </div>
         <button type="submit" class="btn-primary">Do'kon Yaratish</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Invite Link (Super Admin) -->
+  <div class="modal-overlay" id="inviteLinkModal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeModal('inviteLinkModal')">&times;</button>
+      <h2 style="font-family:var(--font-title); font-size:18px; margin-bottom:16px;">🔗 Taklif Havolasi</h2>
+      <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Bu havolani sellerga yuboring. Ular botda shu havolani ochishi bilan do'kon avtomatik ularga bog'lanadi (bir marta ishlaydi).</p>
+      <div class="form-group">
+        <input type="text" class="form-input" id="inviteLinkDisplay" readonly style="font-size:12px;">
+      </div>
+      <button type="button" class="btn-primary" onclick="copyInviteLink()">📋 Nusxalash</button>
     </div>
   </div>
 

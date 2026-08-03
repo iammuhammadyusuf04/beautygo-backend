@@ -145,9 +145,10 @@ async function loadSuperAdminDashboard() {
               <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                 <div>
                   <div style="font-weight:700; font-size:15px; color:var(--accent-gold);">${escapeHtml(s.store_name)}</div>
-                  <div style="font-size:11px; color:var(--text-muted);">Egasi: ${escapeHtml(s.owner_name || 'Admin')} (ID: ${s.owner_telegram_id})</div>
+                  <div style="font-size:11px; color:var(--text-muted);">${s.owner_telegram_id ? `Egasi: ${escapeHtml(s.owner_name || 'Admin')} (ID: ${s.owner_telegram_id})` : `<span style="color:#E67E22;">⏳ Hali egasi tasdiqlanmagan</span>`}</div>
                 </div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  ${!s.owner_telegram_id ? `<button class="role-btn" style="background:#F39C12; font-size:11px;" onclick="generateInviteLink(${s.id})">🔗 Havola</button>` : ''}
                   <button class="role-btn" style="background:#2ECC71; font-size:11px;" onclick="openPayoutModal(${s.id})">💵 Pul Olish</button>
                   <button class="role-btn" style="background:#3498DB; font-size:11px;" onclick="openChangeOwnerModal(${s.id}, '${escapeHtml(String(s.owner_telegram_id || ''))}')">🔄 Egasi</button>
                   <button class="role-btn" style="background:#E74C3C; font-size:11px;" onclick="deleteStore(${s.id}, '${escapeHtml(s.store_name)}')">🗑️ O'chirish</button>
@@ -325,14 +326,48 @@ window.submitCreateStore = async function(e) {
     setBtnLoading(submitBtn, false);
 
     if (data.success) {
-      alert("🎉 Yangi do'kon va do'kon egasi muvaffaqiyatli yaratildi!");
       closeModal('createStoreModal');
       loadSuperAdminDashboard();
+      if (data.invite_link) {
+        showInviteLink(data.invite_link);
+      } else {
+        alert("🎉 Yangi do'kon va do'kon egasi muvaffaqiyatli yaratildi!");
+      }
     } else {
       alert(data.error || "Do'kon qo'shishda xatolik yuz berdi");
     }
   } catch (err) {
     setBtnLoading(submitBtn, false);
+    alert("Xatolik: " + err.message);
+  }
+};
+
+function showInviteLink(link) {
+  document.getElementById('inviteLinkDisplay').value = link;
+  openModal('inviteLinkModal');
+}
+
+window.copyInviteLink = function() {
+  const input = document.getElementById('inviteLinkDisplay');
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    alert('✅ Nusxalandi!');
+  }).catch(() => {
+    document.execCommand('copy');
+    alert('✅ Nusxalandi!');
+  });
+};
+
+window.generateInviteLink = async function(storeId) {
+  try {
+    const res = await apiFetch(`/api/super-admin/stores/${storeId}/invite-link`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showInviteLink(data.invite_link);
+    } else {
+      alert(data.error || "Taklif havolasini yaratishda xatolik");
+    }
+  } catch (err) {
     alert("Xatolik: " + err.message);
   }
 };

@@ -166,6 +166,27 @@ if (bot) {
         user.role = role;
       }
 
+      // Claim a store via a one-time invite link (Super Admin -> new seller).
+      // The owner id is taken straight from Telegram's own trusted `msg.from.id`
+      // — never typed/guessed by the Super Admin — so this can never mismatch.
+      if (param.startsWith('claim_')) {
+        const token = param.replace('claim_', '');
+        const pendingStore = await dbAsync.get('SELECT * FROM stores WHERE claim_token = ?', [token]);
+
+        if (!pendingStore) {
+          return bot.sendMessage(chatId, "⚠️ Bu taklif havolasi noto'g'ri yoki allaqachon ishlatilgan.", { parse_mode: 'Markdown' });
+        }
+
+        await dbAsync.run('UPDATE stores SET owner_telegram_id = ?, claim_token = NULL WHERE id = ?', [telegramId, pendingStore.id]);
+        await dbAsync.run('UPDATE users SET role = ? WHERE telegram_id = ?', ['ADMIN', telegramId]);
+        user.role = 'ADMIN';
+
+        const opts = await getRoleKeyboard(telegramId);
+        const claimedMsg = `🎉 *Tabriklaymiz!* Siz endi *"${escapeMarkdown(pendingStore.store_name)}"* do'konining egasisiz.\n\n` +
+          `Pastdagi "🛍️ Do'kon Egasi Paneli" tugmasi orqali do'koningizni boshqarishingiz mumkin.`;
+        return bot.sendMessage(chatId, claimedMsg, { parse_mode: 'Markdown', ...opts });
+      }
+
       // Deep linking to specific store
       if (param.startsWith('store_')) {
         const storeId = param.replace('store_', '').replace('STORE_', '');
@@ -412,6 +433,19 @@ async function sendCustomerOrderStatusNotification(order, status, storeName = 'B
   }
 }
 
-module.exports = { bot, getRoleKeyboard, sendOrderNotificationToAdmin, broadcastNewProductNotification, sendCustomerOrderStatusNotification };
+let cachedBotUsername = null;
+async function getBotUsername() {
+  if (cachedBotUsername) return cachedBotUsername;
+  if (!bot) return null;
+  try {
+    const me = await bot.getMe();
+    cachedBotUsername = me.username;
+    return cachedBotUsername;
+  } catch (e) {
+    return null;
+  }
+}
+
+module.exports = { bot, getRoleKeyboard, getBotUsername, sendOrderNotificationToAdmin, broadcastNewProductNotification, sendCustomerOrderStatusNotification };
 
 

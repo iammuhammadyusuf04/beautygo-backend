@@ -168,6 +168,8 @@ async function initPg() {
     status TEXT DEFAULT 'ACTIVE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`);
+  // Migration: add claim_token to a stores table that already existed before this column did.
+  await dbAsync.run(`ALTER TABLE stores ADD COLUMN claim_token TEXT`);
 
   await dbAsync.run(`CREATE TABLE IF NOT EXISTS store_subscriptions (
     id SERIAL PRIMARY KEY,
@@ -308,6 +310,8 @@ async function seedPg() {
 function initSqlite(sqliteDb) {
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS users (telegram_id TEXT PRIMARY KEY, username TEXT, full_name TEXT, role TEXT DEFAULT 'USER', language TEXT DEFAULT 'uz', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS stores (id INTEGER PRIMARY KEY AUTOINCREMENT, owner_telegram_id TEXT, store_name TEXT NOT NULL, description TEXT, logo_url TEXT, commission_margin REAL DEFAULT 10.0, status TEXT DEFAULT 'ACTIVE', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+  // Migration: add claim_token to a stores table that already existed before this column did.
+  sqliteDb.run(`ALTER TABLE stores ADD COLUMN claim_token TEXT`, () => {});
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS store_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_telegram_id TEXT NOT NULL, store_id INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_telegram_id, store_id))`);
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, store_id INTEGER NOT NULL, title_uz TEXT NOT NULL, title_ru TEXT NOT NULL, description_uz TEXT, description_ru TEXT, price REAL NOT NULL, category TEXT NOT NULL, sizes TEXT, image_url TEXT, images_json TEXT, is_active INTEGER DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
   sqliteDb.run(`CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_telegram_id TEXT NOT NULL, customer_name TEXT NOT NULL, customer_phone TEXT NOT NULL, customer_note TEXT, store_id INTEGER NOT NULL, items_json TEXT NOT NULL, total_price REAL NOT NULL, commission_amount REAL DEFAULT 0, status TEXT DEFAULT 'PENDING', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
